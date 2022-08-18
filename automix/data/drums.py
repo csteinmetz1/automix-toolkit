@@ -46,6 +46,13 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
             )
             self.mix_filepaths += glob.glob(search_path)
 
+        # remove any mixes that are shorter than the requested length
+        self.mix_filepaths = [
+            fp
+            for fp in self.mix_filepaths
+            if torchaudio.info(fp).num_frames > self.length
+        ]
+
         if len(self.mix_filepaths) < 1:
             raise RuntimeError(f"No files found in {self.root_dir}.")
         else:
