@@ -24,7 +24,7 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
             "tom_2",
         ],
         wet_mix: bool = False,
-        num_examples_per_epoch: int = 10000,
+        num_examples_per_epoch: int = 1000,
     ) -> None:
         super().__init__()
         self.root_dir = root_dir

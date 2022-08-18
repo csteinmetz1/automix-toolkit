@@ -1,5 +1,6 @@
 import torch
 
-class MedleyDBDataset(torch.data.utils.Dataset):
+
+class MedleyDBDataset(torch.utils.data.Dataset):
     def __init__(self) -> None:
         super().__init__()

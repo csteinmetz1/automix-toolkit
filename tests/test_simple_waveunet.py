@@ -2,7 +2,7 @@ import torch
 from tqdm import tqdm
 
 from automix.data.drums import ENSTDrumsDataset
-from automix.models.mixwaveunet.mixwaveunet import MixWaveUNet
+from automix.models.mixwaveunet.simple_waveunet import SimpleWaveUNet
 
 if __name__ == "__main__":
     length = 131072
@@ -14,7 +14,7 @@ if __name__ == "__main__":
         num_workers=16,
     )
 
-    model = MixWaveUNet(7, length)
+    model = SimpleWaveUNet(7, 2)
     model.cuda()
 
     for idx, batch in enumerate(tqdm(dataloader), 0):

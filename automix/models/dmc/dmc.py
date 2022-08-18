@@ -11,8 +11,10 @@ class DifferentiableMixingConsole(torch.nn.Module):
     Steinmetz et al. (2021). Automatic multitrack mixing with a differentiable mixing console of neural audio effects. ICASSP.
     """
 
-    def __init__(self, num_params: int, d_embed: int) -> None:
+    def __init__(self, d_embed: int = 128) -> None:
         super().__init__()
+
+        num_params = 2
 
         self.encoder = Encoder()
         self.post_processor = torch.nn.Sequential(

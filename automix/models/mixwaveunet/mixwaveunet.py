@@ -40,6 +40,8 @@ class MixWaveUNet(torch.nn.Module):
             y (torch.Tensor): Final stereo mixture with shape (bs, 2, seq_len)
         """
         pad_size = self.waveunet.input_size - x.shape[-1]
-        x = torch.nn.functional.pad(x, (0, pad_size))
-        y = self.waveunet(x)
+        x_pad = torch.nn.functional.pad(x, (0, pad_size))
+        y = self.waveunet(x_pad)
+        y = y["ALL"]
+        y = y[..., : x.shape[-1]]
         return y

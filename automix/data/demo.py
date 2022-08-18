@@ -1,7 +1,7 @@
 import torch
 
 
-class DemoMultitrackDataset(torch.data.utils.Dataset):
+class DemoMultitrackDataset(torch.utils.data.Dataset):
     def __init__(self) -> None:
         super().__init__()
 
