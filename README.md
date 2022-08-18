@@ -1,5 +1,9 @@
+<div align="center">
+
 # automix-toolkit
 Models and datasets for training deep learning automatic mixing models
+
+</div>
 
 # Setup
 
