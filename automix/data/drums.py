@@ -96,6 +96,11 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
                 frame_offset=offset,
                 num_frames=self.length,
             )
+
+            # apply random gain augmentation
+            gain_dB = (torch.rand(1) * 24) - 12
+            gain_lin = 10 ** (gain_dB / 20.0)
+            x_s *= gain_lin
             x.append(x_s)
         x = torch.cat(x)
 
