@@ -1,4 +1,5 @@
 import io
+import wandb
 import torch
 import librosa
 import PIL.Image
@@ -135,6 +136,7 @@ class LogAudioCallback(pl.callbacks.Callback):
         dataloader_idx,
     ):
         """Called when the validation batch ends."""
+        sample_rate = pl_module.hparams.sample_rate
 
         if outputs is not None:
             num_examples = outputs["x"].shape[0]
@@ -142,72 +144,28 @@ class LogAudioCallback(pl.callbacks.Callback):
                 num_examples = self.num_examples
 
             if batch_idx == 0:
-                for n in range(num_examples):
-                    self.log_audio(
-                        outputs,
-                        n,
-                        pl_module.hparams.sample_rate,
-                        trainer.global_step,
-                        trainer.logger,
+
+                columns = ["input", "output", "target"]
+                data = []
+
+                for elem_idx in range(num_examples):
+                    x = outputs["x"][elem_idx, ...].float()
+                    # sum the input stems to create mono mix
+                    x = x.sum(dim=0, keepdim=True)
+                    x /= x.abs().max()
+
+                    y = outputs["y"][elem_idx, ...].float()
+                    y /= y.abs().max()
+
+                    y_hat = outputs["y_hat"][elem_idx, ...].float()
+                    y_hat /= y_hat.abs().max()
+
+                    data.append(
+                        [
+                            wandb.Audio(x.T, sample_rate, caption=f"{elem_idx}"),
+                            wandb.Audio(y_hat.T, sample_rate, caption=f"{elem_idx}"),
+                            wandb.Audio(y.T, sample_rate, caption=f"{elem_idx}"),
+                        ]
                     )
 
-    def log_audio(
-        self,
-        outputs,
-        batch_idx: int,
-        sample_rate: int,
-        global_step: int,
-        logger,
-        n_fft: int = 4096,
-        hop_length: int = 1024,
-    ):
-        if "x" in outputs:
-            x = outputs["x"][batch_idx, ...].float()
-            x /= x.abs().max()
-
-            # sum the input stems to create mono mix
-            x = x.sum(dim=0, keepdim=True)
-
-            logger.experiment.add_audio(
-                f"{batch_idx+1}/input",
-                x[0:1, :],
-                global_step,
-                sample_rate=sample_rate,
-            )
-
-        if "y" in outputs:
-            y = outputs["y"][batch_idx, ...].float()
-            y /= y.abs().max()
-
-            logger.experiment.add_audio(
-                f"{batch_idx+1}/target",
-                y,
-                global_step,
-                sample_rate=sample_rate,
-            )
-
-        if "y_hat" in outputs:
-            y_hat = outputs["y_hat"][batch_idx, ...].float()
-            y_hat /= y_hat.abs().max()
-
-            logger.experiment.add_audio(
-                f"{batch_idx+1}/estimate",
-                y_hat,
-                global_step,
-                sample_rate=sample_rate,
-            )
-
-        # skip spectrograms for now
-        if "x" in outputs and "y" in outputs and "y_hat" in outputs and False:
-            logger.experiment.add_image(
-                f"spectrograms/{batch_idx+1}",
-                plot_spectrograms(
-                    x,
-                    y,
-                    y_hat,
-                    n_fft=n_fft,
-                    hop_length=hop_length,
-                    sample_rate=sample_rate,
-                ),
-                global_step,
-            )
+                trainer.logger.log_table(key="audio", columns=columns, data=data)
