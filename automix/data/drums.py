@@ -1,10 +1,12 @@
 import os
 import glob
 import torch
+import argparse
 import torchaudio
 import numpy as np
+import pytorch_lightning as pl
 
-from typing import List
+from typing import List, Optional
 
 
 class ENSTDrumsDataset(torch.utils.data.Dataset):
@@ -105,3 +107,77 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
         x = torch.cat(x)
 
         return x, y
+
+
+class ENSTDrumsDataModule(pl.LightningDataModule):
+    def __init__(self, *args, **kwargs):
+        super().__init__()
+        self.save_hyperparameters()
+
+    def prepare_data(self):
+        # download
+        return
+
+    def setup(self, stage: Optional[str] = None):
+
+        # Assign train/val datasets for use in dataloaders
+        if stage == "fit" or stage is None:
+            self.dataset_train = ENSTDrumsDataset(
+                self.hparams.data_dir,
+                self.hparams.length,
+                self.hparams.sample_rate,
+                drummers=self.hparams.drummers,
+                wet_mix=self.hparams.wet_mix,
+                num_examples_per_epoch=self.hparams.num_example_per_training_epoch,
+            )
+
+        # Assign test dataset for use in dataloader(s)
+        if stage == "test" or stage is None:
+            self.dataset_train = ENSTDrumsDataset(
+                self.hparams.data_dir,
+                self.hparams.length,
+                self.hparams.sample_rate,
+                drummers=self.hparams.drummers,
+                wet_mix=self.hparams.wet_mix,
+                num_examples_per_epoch=self.hparams.num_example_per_testing_epoch,
+            )
+
+    def train_dataloader(self):
+        return torch.utils.data.DataLoader(
+            self.dataset_train,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            shuffle=True,
+            persistent_workers=True,
+        )
+
+    def val_dataloader(self):
+        return torch.utils.data.DataLoader(
+            self.dataset_val,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            shuffle=False,
+            persistent_workers=True,
+        )
+
+    def test_dataloader(self):
+        return torch.utils.data.DataLoader(
+            self.dataset_test,
+            batch_size=self.hparams.batch_size,
+            num_workers=self.hparams.num_workers,
+            shuffle=False,
+            persistent_workers=True,
+        )
+
+    # add any model hyperparameters here
+    @staticmethod
+    def add_model_specific_args(parent_parser):
+        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
+        parser.add_argument("--batch_size", type=int, default=32)
+        parser.add_argument("--num_workers", type=int, default=4)
+        parser.add_argument("--num_examples_per_training_epoch", type=int, default=1000)
+        parser.add_argument(
+            "--num_examples_per_validation_epoch", type=int, default=100
+        )
+        parser.add_argument("--num_examples_per_testing_epoch", type=int, default=100)
+        return parser

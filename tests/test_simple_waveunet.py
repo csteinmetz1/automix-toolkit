@@ -2,7 +2,7 @@ import torch
 from tqdm import tqdm
 
 from automix.data.drums import ENSTDrumsDataset
-from automix.models.mixwaveunet.simple_waveunet import SimpleWaveUNet
+from automix.models.simple_waveunet import SimpleWaveUNet
 
 if __name__ == "__main__":
     length = 131072

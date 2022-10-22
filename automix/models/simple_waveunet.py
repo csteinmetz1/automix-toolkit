@@ -13,12 +13,19 @@ class DownsamplingBlock(torch.nn.Module):
         padding = kernel_size // 2  # calculate same padding
 
         self.conv1 = torch.nn.Conv1d(
-            ch_in, ch_out, kernel_size=kernel_size, padding=padding
+            ch_in,
+            ch_out,
+            kernel_size=kernel_size,
+            padding=padding,
         )
         self.bn = torch.nn.BatchNorm1d(ch_out)
         self.prelu = torch.nn.PReLU(ch_out)
         self.conv2 = torch.nn.Conv1d(
-            ch_out, ch_out, kernel_size=kernel_size, stride=2, padding=padding
+            ch_out,
+            ch_out,
+            kernel_size=kernel_size,
+            stride=2,
+            padding=padding,
         )
 
     def forward(self, x):
@@ -40,13 +47,16 @@ class UpsamplingBlock(torch.nn.Module):
 
         self.skip = skip
         self.conv = torch.nn.Conv1d(
-            ch_in, ch_out, kernel_size=kernel_size, padding=padding
+            ch_in,
+            ch_out,
+            kernel_size=kernel_size,
+            padding=padding,
         )
         self.bn = torch.nn.BatchNorm1d(ch_out)
         self.prelu = torch.nn.PReLU(ch_out)
         self.us = torch.nn.Upsample(scale_factor=2)
 
-    def forward(self, x: torch.Tensor, skip: str):
+    def forward(self, x: torch.Tensor, skip: torch.Tensor):
         x = self.us(x)  # upsample by x2
 
         # handle skip connections
@@ -74,7 +84,7 @@ class SimpleWaveUNet(torch.nn.Module):
         us_kernel: int = 13,
         out_kernel: int = 5,
         layers: int = 6,
-        ch_start: int = 8,
+        ch_start: int = 32,
         ch_growth: int = 2,
         skip: str = "add",
     ):

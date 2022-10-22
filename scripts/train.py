@@ -1,7 +1,10 @@
 import os
 import torch
 import pytorch_lightning as pl
+
 from argparse import ArgumentParser
+from pytorch_lightning.loggers import WandbLogger
+
 
 from automix.system import System
 from automix.callbacks import LogAudioCallback
@@ -22,6 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("--train_length", type=int, default=262144)
     parser.add_argument("--val_length", type=int, default=262144)
     parser.add_argument("--num_workers", type=int, default=8)
+    parser.add_argument("--log_dir", type=str, default="./logs")
 
     parser = System.add_model_specific_args(parser)  # add model specific args
     parser = pl.Trainer.add_argparse_args(parser)  # add all Trainer options
@@ -41,8 +45,12 @@ if __name__ == "__main__":
         ),
     ]
 
+    wandb_logger = WandbLogger(save_dir=args.log_dir)
+
     # create PyTorch Lightning trainer
-    trainer = pl.Trainer.from_argparse_args(args, callbacks=callbacks)
+    trainer = pl.Trainer.from_argparse_args(
+        args, logger=wandb_logger, callbacks=callbacks
+    )
 
     # create the System
     system = System(**vars(args))
@@ -59,6 +67,7 @@ if __name__ == "__main__":
         batch_size=args.batch_size,
         shuffle=True,
         num_workers=args.num_workers,
+        persistent_workers=True,
     )
 
     val_dataset = ENSTDrumsDataset(
@@ -73,6 +82,7 @@ if __name__ == "__main__":
         batch_size=args.batch_size,
         shuffle=False,
         num_workers=args.num_workers,
+        persistent_workers=True,
     )
 
     # train!

@@ -6,7 +6,7 @@ from argparse import ArgumentParser
 
 from automix.models.dmc import DifferentiableMixingConsole
 from automix.models.mixwaveunet import MixWaveUNet
-from automix.models.mixwaveunet.simple_waveunet import SimpleWaveUNet
+from automix.models.simple_waveunet import SimpleWaveUNet
 from automix.utils import center_crop
 
 

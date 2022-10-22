@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=3 python scripts/train.py \
+CUDA_VISIBLE_DEVICES=2,3 python scripts/train.py \
 --dataset_dir "/import/c4dm-datasets/ENST-drums" \
 --dataset_name "enst-drums" \
 --default_root_dir "/import/c4dm-datasets/automix-toolkit" \
@@ -6,7 +6,7 @@ CUDA_VISIBLE_DEVICES=3 python scripts/train.py \
 --train_length 262144 \
 --val_length 262144 \
 --accelerator gpu \
---devices 1 \
+--devices 2 \
 --max_epochs 100 \
---batch_size 16 \
+--batch_size 4 \
 
