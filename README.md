@@ -33,6 +33,25 @@ Or we could build our own dataset using loops from Logic
 
 ### Datasets 
 
-| Name | Mixes | Size (GB) | Download | 
-|------|-------|-----------|----------|
-|      |       |           |          |
+| Name        | Mixes | Size (GB) | Download | 
+|-------------|-------|-----------|----------|
+| ENST-Drums  |       |           |          |
+| MedleyDB    | 
+| 
+
+# Planning 
+
+- [x] Add wandb logging
+- [x] Use sum and difference loss 
+- [] Working WaveUNet
+- [] Working DMC
+- [x] Datasets 
+    - [] MedleyDB
+    - [x] ENST-Drums
+    - [] Mixing Secrets
+    - [] Data augmentation 
+
+We may want to check for silence when loading the mix.
+
+We may want to add some data augmentation. 
+- Randomize the gain of the stems during mixing
