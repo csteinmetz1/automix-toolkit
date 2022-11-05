@@ -26,6 +26,7 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
             "tom_2",
         ],
         wet_mix: bool = False,
+        hits: bool = False,
         num_examples_per_epoch: int = 1000,
     ) -> None:
         super().__init__()
@@ -34,6 +35,8 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
         self.sample_rate = sample_rate
         self.drummers = drummers
         self.track_names = track_names
+        self.wet_mix = wet_mix
+        self.hits = hits
         self.num_examples_per_epoch = num_examples_per_epoch
 
         # find all mixes
@@ -54,6 +57,10 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
             for fp in self.mix_filepaths
             if torchaudio.info(fp).num_frames > self.length
         ]
+
+        # remove any mixes that are just hits
+        if not self.hits:
+            self.mix_filepaths = [fp for fp in self.mix_filepaths if "hits" not in fp]
 
         if len(self.mix_filepaths) < 1:
             raise RuntimeError(f"No files found in {self.root_dir}.")
@@ -82,6 +89,7 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
             frame_offset=offset,
             num_frames=self.length,
         )
+        y *= 0.5  # reduce gain of the target mix
 
         # get all the tracks
         x = []
@@ -99,12 +107,13 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
                 num_frames=self.length,
             )
 
-            # apply random gain augmentation
+            # apply random gain augmentation (-12 to +12 dB)
             gain_dB = (torch.rand(1) * 24) - 12
             gain_lin = 10 ** (gain_dB / 20.0)
             x_s *= gain_lin
             x.append(x_s)
-        x = torch.cat(x)
+
+        x = torch.cat(x)  # collect the tracks into tensor
 
         return x, y
 
