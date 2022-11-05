@@ -58,6 +58,8 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
             if torchaudio.info(fp).num_frames > self.length
         ]
 
+        self.mix_filepaths = self.mix_filepaths[0:1]
+
         # remove any mixes that are just hits
         if not self.hits:
             self.mix_filepaths = [fp for fp in self.mix_filepaths if "hits" not in fp]
@@ -82,6 +84,7 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
         # get random offset
         md = torchaudio.info(mix_filepath)  # check length
         offset = np.random.randint(0, md.num_frames - self.length - 1)
+        offset = 524288
 
         # load the chunk of the mix
         y, sr = torchaudio.load(
