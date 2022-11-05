@@ -23,6 +23,35 @@ def fig2img(fig, dpi=120):
     return image
 
 
+def build_param_table(params, param_names):
+    """
+
+    Args:
+        params (torch.Tensor): Parameters for one mix with shape (num_tracks, num_params)
+
+    """
+    num_tracks, num_params = params.size()
+
+    table = "<html><table>\n"
+    table += "<tr><th>Track</th>\n"
+
+    for param_name in param_names:
+        table += f"<th>{param_name}</th>\n"
+
+    table += "</tr>\n"
+
+    for track_idx in range(num_tracks):
+        table += f"<tr><td>{track_idx}</td>\n"
+        for param_idx in range(num_params):
+            table += f"<td>{params[track_idx, param_idx]:0.2f}</td>\n"
+
+        table += "\n</tr>\n"
+
+    table += "</table>\n</html>"
+
+    return table
+
+
 def plot_spectrograms(
     input: torch.Tensor,
     target: torch.Tensor,
@@ -145,7 +174,7 @@ class LogAudioCallback(pl.callbacks.Callback):
 
             if batch_idx == 0:
 
-                columns = ["input", "output", "target"]
+                columns = ["input", "output", "target", "params"]
                 data = []
 
                 for elem_idx in range(num_examples):
@@ -160,12 +189,19 @@ class LogAudioCallback(pl.callbacks.Callback):
                     y_hat = outputs["y_hat"][elem_idx, ...].float()
                     y_hat /= y_hat.abs().max()
 
-                    data.append(
-                        [
-                            wandb.Audio(x.T, sample_rate, caption=f"{elem_idx}"),
-                            wandb.Audio(y_hat.T, sample_rate, caption=f"{elem_idx}"),
-                            wandb.Audio(y.T, sample_rate, caption=f"{elem_idx}"),
-                        ]
-                    )
+                    entries = [
+                        wandb.Audio(x.T, sample_rate, caption=f"{elem_idx}"),
+                        wandb.Audio(y_hat.T, sample_rate, caption=f"{elem_idx}"),
+                        wandb.Audio(y.T, sample_rate, caption=f"{elem_idx}"),
+                    ]
+
+                    if pl_module.hparams.automix_model == "dmc":
+                        p = outputs["p"][elem_idx, ...].float()
+                        param_table = build_param_table(
+                            p, pl_module.model.mixer.param_names
+                        )
+                        entries.append(wandb.Html(param_table))
+
+                    data.append(entries)
 
                 trainer.logger.log_table(key="audio", columns=columns, data=data)

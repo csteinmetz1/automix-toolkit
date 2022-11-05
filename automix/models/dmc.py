@@ -87,8 +87,8 @@ class Encoder(torch.nn.Module):
             hop_length=n_fft // 4,
             n_mels=n_mels,
         )
-        self.to_db = torchaudio.transforms.AmplitudeToDB()
-        self.spec_bn = torch.nn.BatchNorm2d(1)
+        # self.to_db = torchaudio.transforms.AmplitudeToDB()
+        # self.spec_bn = torch.nn.BatchNorm2d(1)
 
         # CNN
         self.layer1 = Res_2d(1, n_channels, stride=2)
@@ -114,9 +114,10 @@ class Encoder(torch.nn.Module):
         """
         # Spectrogram
         x = self.spec(x)
-        x = self.to_db(x)
+        # x = self.to_db(x)
+        x = torch.pow(x.abs() + 1e-8, 0.3)
         x = x.unsqueeze(1)
-        x = self.spec_bn(x)
+        # x = self.spec_bn(x)
 
         # CNN
         x = self.layer1(x)
@@ -161,10 +162,11 @@ class Mixer(torch.nn.Module):
         self,
         sample_rate: float,
         min_gain_dB: int = -48.0,
-        max_gain_dB: int = 12.0,
+        max_gain_dB: int = 48.0,
     ) -> None:
         super().__init__()
         self.num_params = 2
+        self.param_names = ["Gain dB", "Pan"]
         self.sample_rate = sample_rate
         self.min_gain_dB = min_gain_dB
         self.max_gain_dB = max_gain_dB
@@ -205,7 +207,15 @@ class Mixer(torch.nn.Module):
         # generate a mix for each batch item by summing stereo tracks
         y = torch.sum(x, dim=1)  # (bs, 2, seq_len)
 
-        return y
+        p = torch.cat(
+            (
+                gain_dB.view(bs, num_tracks, 1),
+                pan.view(bs, num_tracks, 1),
+            ),
+            dim=-1,
+        )
+
+        return y, p
 
 
 class DifferentiableMixingConsole(torch.nn.Module):
@@ -239,7 +249,7 @@ class DifferentiableMixingConsole(torch.nn.Module):
 
         Returns:
             y (torch.Tensor): Final stereo mixture with shape (bs, 2, seq_len)
-            p (torch.Tensor): Estimated mixing parameters with shape (bs, num_tracks, num_params)
+            p (torch.Tensor): Estimated (denormalized) mixing parameters with shape (bs, num_tracks, num_params)
         """
         bs, num_tracks, seq_len = x.size()
 
@@ -262,6 +272,6 @@ class DifferentiableMixingConsole(torch.nn.Module):
 
         # generate the stereo mix
         x = x.view(bs, num_tracks, -1)  # move tracks back from batch dim
-        y = self.mixer(x, p)  # (bs, 2, seq_len)
+        y, p = self.mixer(x, p)  # (bs, 2, seq_len) # and denormalized params
 
         return y, p

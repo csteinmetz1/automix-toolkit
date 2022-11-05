@@ -21,7 +21,7 @@ class System(pl.LightningModule):
         elif self.hparams.automix_model == "simple-waveunet":
             self.model = SimpleWaveUNet(7, 2)
         elif self.hparams.automix_model == "dmc":
-            self.model = DifferentiableMixingConsole()
+            self.model = DifferentiableMixingConsole(self.hparams.sample_rate)
         else:
             raise RuntimeError(f"Invalid automix_model: {self.hparams.automix_model}")
 
@@ -39,6 +39,12 @@ class System(pl.LightningModule):
                 )
             elif recon_loss == "l1":
                 self.recon_losses[recon_loss] = torch.nn.L1Loss()
+            elif recon_loss == "sd":
+                self.recon_losses[recon_loss] = auraloss.freq.SumAndDifferenceSTFTLoss(
+                    fft_sizes=[4096, 1024, 256],
+                    hop_sizes=[2048, 512, 128],
+                    win_lengths=[4096, 1024, 256],
+                )
             else:
                 raise RuntimeError(f"Invalid reconstruction loss: {recon_loss}")
 
@@ -79,7 +85,7 @@ class System(pl.LightningModule):
         x, y = batch  # tracks, mix
 
         # process input audio with model
-        y_hat = self(x)
+        y_hat, params = self(x)
 
         # compute loss
         loss = 0
@@ -135,6 +141,7 @@ class System(pl.LightningModule):
             "x": x.detach().float().cpu(),
             "y": y.detach().float().cpu(),
             "y_hat": y_hat.detach().float().cpu(),
+            "p": params.detach().cpu(),
         }
 
         return loss, data_dict
@@ -173,9 +180,9 @@ class System(pl.LightningModule):
         parser.add_argument("--batch_size", type=int, default=32)
         parser.add_argument("--lr", type=float, default=3e-4)
         # --- Loss functions  ---
-        parser.add_argument("--recon_losses", nargs="+", default=["l1", "mrstft"])
-        parser.add_argument("--recon_loss_weights", nargs="+", default=[100.0, 1.0])
+        parser.add_argument("--recon_losses", nargs="+", default=["sd"])
+        parser.add_argument("--recon_loss_weights", nargs="+", default=[1.0])
         # --- Model ---
-        parser.add_argument("--automix_model", type=str, default="mixwaveunet")
+        parser.add_argument("--automix_model", type=str, default="dmc")
 
         return parser
