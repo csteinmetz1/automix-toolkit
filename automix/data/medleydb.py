@@ -1,7 +1,9 @@
 import os
 import glob
 import torch
+import random
 import torchaudio
+import numpy as np
 
 from typing import List
 
@@ -26,7 +28,6 @@ class MedleyDBDataset(torch.utils.data.Dataset):
 
         self.mix_dirs = []
         for root_dir in root_dirs:
-            print(root_dir)
             # find all mix directories
             mix_dirs = glob.glob(os.path.join(root_dir, "*"))
             # remove items that are not directories
@@ -36,41 +37,34 @@ class MedleyDBDataset(torch.utils.data.Dataset):
 
         self.mix_dirs = self.mix_dirs[indices[0] : indices[1]]  # select subset
 
-        # create examples from each mix directory
+        self.examples = []
+        # check for mix and tracks in each directory
         for mix_dir in self.mix_dirs:
-            self.examples = []
-            # check for mix and tracks in each directory
-            for mix_dir in self.mix_dirs:
-                mix_id = os.path.basename(mix_dir)
-                mix_filepath = glob.glob(os.path.join(mix_dir, "*.wav"))
+            mix_id = os.path.basename(mix_dir)
+            mix_filepath = glob.glob(os.path.join(mix_dir, "*.wav"))[0]
 
-                # now check the length of the mix
+            # now check the length of the mix
+            try:
                 mix_num_frames = torchaudio.info(mix_filepath).num_frames
+            except:
+                print(f"Skipping {mix_filepath}")
+                continue
 
-                # now find all the track filepaths
-                track_filepaths = glob.glob(
-                    os.path.join(mix_dir, f"{mix_id}_RAW", "*.wav")
-                )
+            # now find all the track filepaths
+            track_filepaths = glob.glob(os.path.join(mix_dir, f"{mix_id}_RAW", "*.wav"))
 
-                # check length of each track
-                for tidx, track_filepath in enumerate(track_filepaths):
-                    track_num_frames = torchaudio.info(track_filepath).num_frames
-                    print(
-                        tidx,
-                        mix_filepath,
-                        track_filepath,
-                        track_num_frames,
-                        mix_num_frames,
-                    )
+            # check length of each track
+            for tidx, track_filepath in enumerate(track_filepaths):
+                track_num_frames = torchaudio.info(track_filepath).num_frames
 
-                # store this example
-                example = {
-                    "mix_id": os.path.dirname(mix_filepath).split(os.sep)[-2],
-                    "mix_filepath": mix_filepath,
-                    "num_frames": num_frames,
-                    "track_filepaths": track_filepaths,
-                }
-                self.examples.append(example)
+            # store this example
+            example = {
+                "mix_id": os.path.dirname(mix_filepath).split(os.sep)[-1],
+                "mix_filepath": mix_filepath,
+                "num_frames": mix_num_frames,
+                "track_filepaths": track_filepaths,
+            }
+            self.examples.append(example)
 
         if len(self.examples) < 1:
             raise RuntimeError(f"No examples found in {self.root_dir}.")
@@ -98,7 +92,8 @@ class MedleyDBDataset(torch.utils.data.Dataset):
             frame_offset=offset,
             num_frames=self.length,
         )
-        y *= 0.5  # reduce gain of the target mix
+        print(y.shape, example["mix_filepath"], example["num_frames"])
+        y /= y.abs().max()
 
         # -------------------- load the tracks from disk --------------------
         x = torch.zeros((self.max_num_tracks, self.length))
@@ -117,19 +112,10 @@ class MedleyDBDataset(torch.utils.data.Dataset):
             gain_lin = 10 ** (gain_dB / 20.0)
             x_s *= gain_lin
 
-            # store
-            print(
-                example["mix_id"],
-                x.shape,
-                y.shape,
-                x_s.shape,
-                offset,
-                example["num_frames"],
-            )
             x[tidx, :] = x_s
             pad[tidx] = False
 
-            if (tidx + 1) > self.max_num_tracks:
+            if (tidx + 1) >= self.max_num_tracks:
                 break
 
         return x, y, pad
