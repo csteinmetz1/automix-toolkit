@@ -59,13 +59,14 @@ if __name__ == "__main__":
         args.dataset_dir,
         args.train_length,
         44100,
-        drummers=[1, 2],
-        num_examples_per_epoch=10000,
+        drummers=[1, 2, 3],
+        indices=[0, 336],
+        num_examples_per_epoch=1000,
     )
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,
         batch_size=args.batch_size,
-        shuffle=True,
+        shuffle=False,
         num_workers=args.num_workers,
         persistent_workers=True,
     )
@@ -74,8 +75,9 @@ if __name__ == "__main__":
         args.dataset_dir,
         args.train_length,
         44100,
-        drummers=[3],
-        num_examples_per_epoch=1000,
+        drummers=[1, 2, 3],
+        indices=[336, 420],
+        num_examples_per_epoch=100,
     )
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,
