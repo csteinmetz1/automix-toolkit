@@ -84,7 +84,7 @@ class SimpleWaveUNet(torch.nn.Module):
         us_kernel: int = 13,
         out_kernel: int = 5,
         layers: int = 6,
-        ch_start: int = 32,
+        ch_start: int = 16,
         ch_growth: int = 2,
         skip: str = "add",
     ):
@@ -144,6 +144,6 @@ class SimpleWaveUNet(torch.nn.Module):
             skip = skips.pop()
             x = dec(x, skip)
 
-        x = self.output_conv(x)
+        y = self.output_conv(x)
 
-        return x
+        return y, torch.zeros(1)  # return dummy parameters

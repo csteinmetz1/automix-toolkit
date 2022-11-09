@@ -44,4 +44,4 @@ class MixWaveUNet(torch.nn.Module):
         y = self.waveunet(x_pad)
         y = y["ALL"]
         y = y[..., : x.shape[-1]]
-        return y
+        return y, None  # return dummy parameters
