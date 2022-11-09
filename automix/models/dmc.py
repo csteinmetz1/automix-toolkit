@@ -1,7 +1,63 @@
 import torch
 import torchaudio
+import torchopenl3
 
 from automix.utils import restore_from_0to1
+
+
+class OpenL3Encoder(torch.nn.Module):
+    def __init__(self, sample_rate: float) -> None:
+        super().__init__()
+        self.sample_rate = sample_rate
+        self.model = torchopenl3.models.load_audio_embedding_model(
+            input_repr="mel128",
+            content_type="music",
+            embedding_size=512,
+        )
+        self.d_embed = 512
+
+    def forward(self, x: torch.Tensor):
+        with torch.no_grad():
+            emb, ts = torchopenl3.get_audio_embedding(
+                x,
+                self.sample_rate,
+                model=self.model,
+                sampler="julian",
+                hop_size=1.0,
+                batch_size=64,
+            )
+            emb = emb.mean(dim=1)
+        return emb
+
+
+class VGGishEncoder(torch.nn.Module):
+    def __init__(self, sample_rate: float) -> None:
+        super().__init__()
+        model = torch.hub.load("harritaylor/torchvggish", "vggish")
+        model.eval()
+        self.sample_rate = sample_rate
+        self.model = model
+        self.d_embed = 128
+        self.resample = torchaudio.transforms.Resample(sample_rate, 16000)
+
+        for name, param in self.model.named_parameters():
+            param.requires_grad = False
+
+    def forward(self, x: torch.Tensor):
+        bs, seq_len = x.size()
+        with torch.no_grad():
+            if self.sample_rate != 16000:
+                x = self.resample(x)
+            z = []
+            for bidx in range(bs):
+                x_item = x[bidx : bidx + 1, :]
+                x_item = x_item.permute(1, 0)
+                x_item = x_item.cpu().view(-1).numpy()
+                z_item = self.model(x_item, fs=16000)
+                z_item = z_item.mean(dim=0)  # mean across time frames
+                z.append(z_item)
+            z = torch.cat(z, dim=0)
+        return z
 
 
 class Res_2d(torch.nn.Module):
@@ -13,7 +69,7 @@ class Res_2d(torch.nn.Module):
     Adapted from https://github.com/minzwon/sota-music-tagging-models. Licensed under MIT by Minz Won.
     """
 
-    def __init__(self, input_channels, output_channels, shape=3, stride=2):
+    def __init__(self, input_channels: int, output_channels, shape=3, stride=2):
         super(Res_2d, self).__init__()
         # convolution
         self.conv_1 = torch.nn.Conv2d(
@@ -58,7 +114,7 @@ class Res_2d(torch.nn.Module):
         return out
 
 
-class Encoder(torch.nn.Module):
+class ShortChunkCNN_Res(torch.nn.Module):
     """Short-chunk CNN architecture with residual connections.
 
     Args:
@@ -72,23 +128,28 @@ class Encoder(torch.nn.Module):
 
     def __init__(
         self,
-        d_embed: int,
-        sample_rate: float,
-        n_channels: int = 128,
-        n_fft: int = 1024,
-        n_mels: int = 128,
+        sample_rate,
+        n_channels=128,
+        n_fft=512,
+        f_min=0.0,
+        f_max=8000.0,
+        n_mels=128,
+        n_class=50,
+        ckpt_path=None,
     ):
         super().__init__()
+        self.sample_rate = sample_rate
 
         # Spectrogram
         self.spec = torchaudio.transforms.MelSpectrogram(
-            sample_rate=sample_rate,
+            sample_rate=16000,
             n_fft=n_fft,
-            hop_length=n_fft // 4,
+            f_min=f_min,
+            f_max=f_max,
             n_mels=n_mels,
         )
-        # self.to_db = torchaudio.transforms.AmplitudeToDB()
-        # self.spec_bn = torch.nn.BatchNorm2d(1)
+        self.to_db = torchaudio.transforms.AmplitudeToDB()
+        self.spec_bn = torch.nn.BatchNorm2d(1)
 
         # CNN
         self.layer1 = Res_2d(1, n_channels, stride=2)
@@ -100,24 +161,31 @@ class Encoder(torch.nn.Module):
         self.layer7 = Res_2d(n_channels * 2, n_channels * 4, stride=2)
 
         # Dense
-        self.dense1 = torch.nn.Linear(n_channels * 4, d_embed)
+        self.dense1 = torch.nn.Linear(n_channels * 4, n_channels * 4)
+        self.bn = torch.nn.BatchNorm1d(n_channels * 4)
+        self.dense2 = torch.nn.Linear(n_channels * 4, n_class)
+        self.dropout = torch.nn.Dropout(0.5)
         self.relu = torch.nn.ReLU()
 
-    def forward(self, x: torch.Tensor):
-        """Compute aggregated embeddings for batch of waveform tensors.
+        if ckpt_path is not None:
+            checkpoint = torch.load(ckpt_path)
+            self.load_state_dict(checkpoint)
+            print(f"Loaded weights from {ckpt_path}")
 
-        Args:
-            x (torch.Tensor): Batch of waveform tensors with shape (bs, 1, seq_len).
+        self.d_embed = n_channels * 4
+        self.resample = torchaudio.transforms.Resample(sample_rate, 16000)
 
-        Returns:
-            z (torch.Tensor): Embeddings of shape (bs, d_embed).
-        """
+    def forward(self, x):
+
+        # resampling
+        if self.sample_rate != 16000:
+            x = self.resample(x)
+
         # Spectrogram
         x = self.spec(x)
-        # x = self.to_db(x)
-        x = torch.pow(x.abs() + 1e-8, 0.3)
+        x = self.to_db(x)
         x = x.unsqueeze(1)
-        # x = self.spec_bn(x)
+        x = self.spec_bn(x)
 
         # CNN
         x = self.layer1(x)
@@ -136,7 +204,11 @@ class Encoder(torch.nn.Module):
 
         # Dense
         x = self.dense1(x)
+        # x = self.bn(x)
         x = self.relu(x)
+        # x = self.dropout(x)
+        # x = self.dense2(x)
+        # x = nn.Sigmoid()(x)
 
         return x
 
@@ -146,8 +218,10 @@ class PostProcessor(torch.nn.Module):
         super().__init__()
         self.mlp = torch.nn.Sequential(
             torch.nn.Linear(d_embed, 256),
+            # torch.nn.Dropout(0.1),
             torch.nn.PReLU(),
             torch.nn.Linear(256, 256),
+            # torch.nn.Dropout(0.1),
             torch.nn.PReLU(),
             torch.nn.Linear(256, num_params),
             torch.nn.Sigmoid(),
@@ -162,7 +236,7 @@ class Mixer(torch.nn.Module):
         self,
         sample_rate: float,
         min_gain_dB: int = -48.0,
-        max_gain_dB: int = 48.0,
+        max_gain_dB: int = 24.0,
     ) -> None:
         super().__init__()
         self.num_params = 2
@@ -228,17 +302,31 @@ class DifferentiableMixingConsole(torch.nn.Module):
     Steinmetz et al. (2021). Automatic multitrack mixing with a differentiable mixing console of neural audio effects. ICASSP.
     """
 
-    def __init__(self, sample_rate: int, d_embed: int = 128) -> None:
+    def __init__(self, sample_rate: int, encoder_arch: str = "short_res") -> None:
         super().__init__()
+        self.sample_rate = sample_rate
+        self.encoder_arch = encoder_arch
 
         # Creates a mix given tracks and parameters (also called the "Transformation Network")
         self.mixer = Mixer(sample_rate)
 
         # Simple 2D CNN on spectrograms
-        self.encoder = Encoder(d_embed, sample_rate)
+        if encoder_arch == "vggish":
+            self.encoder = VGGishEncoder(sample_rate)
+        elif encoder_arch == "openl3":
+            self.encoder = OpenL3Encoder(sample_rate)
+        elif encoder_arch == "short_res":
+            self.encoder = ShortChunkCNN_Res(
+                sample_rate, ckpt_path="./automix/checkpoints/short_res_best_model.pth"
+            )
+        else:
+            raise ValueError(f"Invalid encoder_arch: {encoder_arch}")
 
         # MLP projects embedding + context to parameter space
-        self.post_processor = PostProcessor(self.mixer.num_params, d_embed * 2)
+        self.post_processor = PostProcessor(
+            self.mixer.num_params,
+            self.encoder.d_embed * 2,
+        )
 
     def forward(self, x: torch.Tensor):
         """Given a set of tracks, analyze them with a shared encoder, predict a set of mixing parameters,
@@ -255,6 +343,8 @@ class DifferentiableMixingConsole(torch.nn.Module):
 
         # move tracks to the batch dimension to fully parallelize embedding computation
         x = x.view(bs * num_tracks, -1)
+
+        self.encoder.eval()  # no batch norm or dropout
 
         # generate single embedding for each track
         e = self.encoder(x)
