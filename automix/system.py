@@ -16,10 +16,10 @@ class System(pl.LightningModule):
         self.save_hyperparameters()
 
         # create the model
-        if self.hparams.automix_model == "mixwaveunet":
-            self.model = MixWaveUNet(7, self.hparams.train_length)
-        elif self.hparams.automix_model == "simple-waveunet":
-            self.model = SimpleWaveUNet(7, 2)
+        if self.hparams.automix_model == "old-mixwaveunet":
+            self.model = MixWaveUNet(8, self.hparams.train_length)
+        elif self.hparams.automix_model == "mixwaveunet":
+            self.model = SimpleWaveUNet(8, 2)
         elif self.hparams.automix_model == "dmc":
             self.model = DifferentiableMixingConsole(self.hparams.sample_rate)
         else:
@@ -164,11 +164,11 @@ class System(pl.LightningModule):
             betas=(0.9, 0.999),
         )
 
-        scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=100, gamma=0.1)
+        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+            optimizer, T_max=self.hparams.max_steps
+        )
 
-        lr_schedulers = {
-            "scheduler": scheduler,
-        }
+        lr_schedulers = {"scheduler": scheduler, "interval": "step", "frequency": 1}
 
         return [optimizer], lr_schedulers
 

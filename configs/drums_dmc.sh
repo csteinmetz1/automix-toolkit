@@ -7,7 +7,7 @@ CUDA_VISIBLE_DEVICES=0 python scripts/train.py \
 --val_length 262144 \
 --accelerator gpu \
 --devices 1 \
---max_epochs 100 \
---batch_size 4 \
---lr 1e-5 \
-
+--batch_size 16 \
+--lr 3e-4 \
+--max_epochs 1000 \
+--max_steps 100000 \
