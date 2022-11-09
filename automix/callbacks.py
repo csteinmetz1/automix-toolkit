@@ -174,7 +174,9 @@ class LogAudioCallback(pl.callbacks.Callback):
 
             if batch_idx == 0:
 
-                columns = ["input", "output", "target", "params"]
+                columns = ["input", "output", "target"]
+                if pl_module.hparams.automix_model == "dmc":
+                    columns.append("params")
                 data = []
 
                 for elem_idx in range(num_examples):
