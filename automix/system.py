@@ -7,7 +7,6 @@ from argparse import ArgumentParser
 from automix.models.dmc import DifferentiableMixingConsole
 from automix.models.mixwaveunet import MixWaveUNet
 from automix.models.simple_waveunet import SimpleWaveUNet
-from automix.utils import center_crop
 
 
 class System(pl.LightningModule):
@@ -59,14 +58,14 @@ class System(pl.LightningModule):
             w_log_mag=1.0,
         )
 
-    def forward(self, x: torch.Tensor) -> torch.Tensor:
+    def forward(self, x: torch.Tensor, track_mask: torch.Tensor = None) -> torch.Tensor:
         """Apply model to audio waveform tracks.
         Args:
             x (torch.Tensor): Set of input tracks with shape (bs, num_tracks, seq_len)
         Returns:
             y_hat (torch.Tensor): Stereo mix with shape (bs, 2, seq_len)
         """
-        return self.model(x)
+        return self.model(x, track_mask)
 
     def common_step(
         self,
@@ -82,10 +81,10 @@ class System(pl.LightningModule):
             optimizer_idx (int): Index of the optimizer, this step is called once for each optimizer.
             train (bool): Wether step is called during training (True) or validation (False).
         """
-        x, y = batch  # tracks, mix
+        x, y, track_mask = batch  # tracks, mix, mask
 
         # process input audio with model
-        y_hat, params = self(x)
+        y_hat, params = self(x, track_mask)
 
         # compute loss
         loss = 0
