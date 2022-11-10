@@ -1,6 +1,6 @@
 CUDA_VISIBLE_DEVICES=1 python scripts/train.py \
 --dataset_dir "/import/c4dm-datasets/ENST-drums" \
---dataset_name "enst-drums" \
+--dataset_name "ENST-drums" \
 --log_dir "/import/c4dm-datasets-ext/automix-toolkit" \
 --automix_model "mixwaveunet" \
 --train_length 262144 \
