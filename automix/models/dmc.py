@@ -328,12 +328,13 @@ class DifferentiableMixingConsole(torch.nn.Module):
             self.encoder.d_embed * 2,
         )
 
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, track_mask: torch.Tensor = None):
         """Given a set of tracks, analyze them with a shared encoder, predict a set of mixing parameters,
         and use these parameters to generate a stereo mixture of the inputs.
 
         Args:
             x (torch.Tensor): Input tracks with shape (bs, num_tracks, seq_len)
+            track_mask (torch.Tensor, optional): Mask specifying inactivate tracks with shape (bs, num_tracks)
 
         Returns:
             y (torch.Tensor): Final stereo mixture with shape (bs, 2, seq_len)
@@ -343,8 +344,6 @@ class DifferentiableMixingConsole(torch.nn.Module):
 
         # move tracks to the batch dimension to fully parallelize embedding computation
         x = x.view(bs * num_tracks, -1)
-
-        self.encoder.eval()  # no batch norm or dropout
 
         # generate single embedding for each track
         e = self.encoder(x)
