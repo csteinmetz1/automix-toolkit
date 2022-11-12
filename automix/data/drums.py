@@ -43,6 +43,7 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
         self.wet_mix = wet_mix
         self.hits = hits
         self.num_examples_per_epoch = num_examples_per_epoch
+        self.max_num_tracks = 8  # this is fixed for this dataset
 
         # find all mixes
         self.mix_filepaths = []
@@ -62,6 +63,9 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
             for fp in self.mix_filepaths
             if torchaudio.info(fp).num_frames > self.length
         ]
+
+        # remove any mixes that have "norm" in the filename
+        self.mix_filepaths = [fp for fp in self.mix_filepaths if not "norm" in fp]
 
         # self.mix_filepaths = self.mix_filepaths[0:1]
 
@@ -103,16 +107,16 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
                 num_frames=self.length,
             )
             energy = (y**2).mean()
-            if (y**2).mean() > 1e-8:
+            if energy > 1e-8:
                 silent = False
 
-            # torchaudio.save(f"debug/{energy:0.4e}.wav", y, sr)
+        y /= y.abs().max().clamp(1e-8)  # peak normalize
 
-        y /= y.abs().max().clamp(1e-8)
+        # -------------------- load the tracks from disk --------------------
+        x = torch.zeros((self.max_num_tracks, self.length))
+        pad = [True] * self.max_num_tracks  # note which tracks are empty
 
-        # get all the tracks
-        x = []
-        for track_name in self.track_names:
+        for tidx, track_name in enumerate(self.track_names):
             track_filepath = os.path.join(
                 self.root_dir,
                 drummer_id,
@@ -128,90 +132,7 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
                 )
                 x_s /= x_s.abs().max().clamp(1e-6)
                 x_s *= 10 ** (-12 / 20.0)
-                # apply random gain augmentation (-12 to +12 dB)
-                gain_dB = (torch.rand(1) * 24) - 12
-                gain_lin = 10 ** (gain_dB / 20.0)
-                # x_s *= gain_lin
-                x.append(x_s)
-            else:
-                x.append(torch.zeros(1, self.length))
+                x[tidx, :] = x_s
+                pad[tidx] = False
 
-        x = torch.cat(x)  # collect the tracks into tensor
-
-        return x, y
-
-
-class ENSTDrumsDataModule(pl.LightningDataModule):
-    def __init__(self, *args, **kwargs):
-        super().__init__()
-        self.save_hyperparameters()
-
-    def prepare_data(self):
-        # download
-        return
-
-    def setup(self, stage: Optional[str] = None):
-
-        # Assign train/val datasets for use in dataloaders
-        if stage == "fit" or stage is None:
-            self.dataset_train = ENSTDrumsDataset(
-                self.hparams.data_dir,
-                self.hparams.length,
-                self.hparams.sample_rate,
-                drummers=self.hparams.drummers,
-                wet_mix=self.hparams.wet_mix,
-                num_examples_per_epoch=self.hparams.num_example_per_training_epoch,
-            )
-
-        # Assign test dataset for use in dataloader(s)
-        if stage == "test" or stage is None:
-            self.dataset_train = ENSTDrumsDataset(
-                self.hparams.data_dir,
-                self.hparams.length,
-                self.hparams.sample_rate,
-                drummers=self.hparams.drummers,
-                wet_mix=self.hparams.wet_mix,
-                num_examples_per_epoch=self.hparams.num_example_per_testing_epoch,
-            )
-
-    def train_dataloader(self):
-        return torch.utils.data.DataLoader(
-            self.dataset_train,
-            batch_size=self.hparams.batch_size,
-            num_workers=self.hparams.num_workers,
-            shuffle=True,
-            persistent_workers=True,
-        )
-
-    def val_dataloader(self):
-        return torch.utils.data.DataLoader(
-            self.dataset_val,
-            batch_size=self.hparams.batch_size,
-            num_workers=self.hparams.num_workers,
-            shuffle=False,
-            persistent_workers=True,
-        )
-
-    def test_dataloader(self):
-        return torch.utils.data.DataLoader(
-            self.dataset_test,
-            batch_size=self.hparams.batch_size,
-            num_workers=self.hparams.num_workers,
-            shuffle=False,
-            persistent_workers=True,
-        )
-
-    # add any model hyperparameters here
-    @staticmethod
-    def add_model_specific_args(parent_parser):
-        parser = argparse.ArgumentParser(parents=[parent_parser], add_help=False)
-        parser.add_argument("--batch_size", type=int, default=32)
-        parser.add_argument("--num_workers", type=int, default=4)
-        parser.add_argument(
-            "--num_examples_per_training_epoch", type=int, default=10000
-        )
-        parser.add_argument(
-            "--num_examples_per_validation_epoch", type=int, default=100
-        )
-        parser.add_argument("--num_examples_per_testing_epoch", type=int, default=100)
-        return parser
+        return x, y, pad

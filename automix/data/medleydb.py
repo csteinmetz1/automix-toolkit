@@ -19,7 +19,8 @@ class MedleyDBDataset(torch.utils.data.Dataset):
         max_num_tracks: int = 16,
         num_examples_per_epoch: int = 1000,
         buffer_size_gb: float = 3.0,
-        buffer_reload_rate: int = 500,
+        buffer_reload_rate: int = 1000,
+        normalization: str = "peak",
     ) -> None:
         super().__init__()
         self.root_dirs = root_dirs
@@ -30,6 +31,7 @@ class MedleyDBDataset(torch.utils.data.Dataset):
         self.num_examples_per_epoch = num_examples_per_epoch
         self.buffer_size_gb = buffer_size_gb
         self.buffer_reload_rate = buffer_reload_rate
+        self.normalization = normalization
 
         self.mix_dirs = []
         for root_dir in root_dirs:
@@ -132,15 +134,8 @@ class MedleyDBDataset(torch.utils.data.Dataset):
             if y.shape[-1] == self.length and energy > 1e-4:
                 silent = False
 
-            # print(y.shape, energy, counter)
             counter += 1
 
-            # print(
-            #    y.shape,
-            #    os.path.basename(example["mix_filepath"]),
-            #    example["num_frames"],
-            #    energy,
-            # )
             y /= y.abs().max()
 
         # -------------------- load the tracks from disk --------------------
@@ -153,11 +148,10 @@ class MedleyDBDataset(torch.utils.data.Dataset):
             x_s = track[:, start_idx:end_idx]
 
             energy = (x_s**2).mean()
-
-            if energy > 1e-4:
+            if energy > 1e-6:  # ensure track is active
                 gain_dB = -12
                 gain_lin = 10 ** (gain_dB / 20.0)
-                x_s /= x_s.abs().max()
+                x_s /= x_s.abs().max().clamp(1e-8)
                 x_s *= gain_lin
 
                 x[tidx, :] = x_s
