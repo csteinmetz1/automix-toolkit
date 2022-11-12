@@ -1,4 +1,5 @@
 import os
+import csv
 import torch
 import pytorch_lightning as pl
 
@@ -46,7 +47,7 @@ if __name__ == "__main__":
         ),
     ]
 
-    wandb_logger = WandbLogger(save_dir=args.log_dir)
+    wandb_logger = WandbLogger(save_dir=args.log_dir, project="automix")
 
     # create PyTorch Lightning trainer
     trainer = pl.Trainer.from_argparse_args(
@@ -62,7 +63,7 @@ if __name__ == "__main__":
             args.train_length,
             44100,
             drummers=[1, 2, 3],
-            indices=[0, 336],
+            indices=[0, 168],
             num_examples_per_epoch=1000,
         )
         val_dataset = ENSTDrumsDataset(
@@ -70,9 +71,20 @@ if __name__ == "__main__":
             args.train_length,
             44100,
             drummers=[1, 2, 3],
-            indices=[336, 420],
+            indices=[168, 189],
             num_examples_per_epoch=100,
         )
+        test_dataset = ENSTDrumsDataset(
+            args.dataset_dirs[0],
+            args.train_length,
+            44100,
+            drummers=[1, 2, 3],
+            indices=[189, 210],
+            num_examples_per_epoch=100,
+        )
+        train_set = train_dataset.mix_filepaths
+        val_set = val_dataset.mix_filepaths
+        test_set = test_dataset.mix_filepaths
     elif args.dataset_name == "MedleyDB":
         train_dataset = MedleyDBDataset(
             args.dataset_dirs,
@@ -80,17 +92,39 @@ if __name__ == "__main__":
             44100,
             indices=[0, 156],
             max_num_tracks=args.max_num_tracks,
-            num_examples_per_epoch=1000,
+            num_examples_per_epoch=10000,
         )
-
         val_dataset = MedleyDBDataset(
             args.dataset_dirs,
             args.val_length,
             44100,
-            indices=[156, 197],
+            indices=[156, 175],
             max_num_tracks=args.max_num_tracks,
             num_examples_per_epoch=100,
         )
+        test_dataset = MedleyDBDataset(
+            args.dataset_dirs,
+            args.val_length,
+            44100,
+            indices=[175, 197],
+            max_num_tracks=args.max_num_tracks,
+            num_examples_per_epoch=100,
+        )
+        train_set = train_dataset.mix_dirs
+        val_set = val_dataset.mix_dirs
+        test_set = test_dataset.mix_dirs
+
+    # create a file with the train/val/test split
+    csv_filepath = os.path.join(wandb_logger.experiment.dir, "split.csv")
+    print(csv_filepath)
+    with open(csv_filepath, "w") as f:
+        writer = csv.writer(f)
+        for fp in train_set:
+            writer.writerow(["train", fp])
+        for fp in val_set:
+            writer.writerow(["val", fp])
+        for fp in test_set:
+            writer.writerow(["test", fp])
 
     train_dataloader = torch.utils.data.DataLoader(
         train_dataset,

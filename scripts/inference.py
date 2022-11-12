@@ -31,6 +31,12 @@ if __name__ == "__main__":
         default="./mix.wav",
         type=str,
     )
+    parser.add_argument(
+        "--max_samples",
+        help="Maximum number of samples to process.",
+        default=262144,
+        type=str,
+    )
 
     args = parser.parse_args()
 
@@ -40,21 +46,28 @@ if __name__ == "__main__":
 
     # load the input tracks
     track_filepaths = glob.glob(os.path.join(args.track_dir, f"*.{args.ext}"))
+    track_filepaths = sorted(track_filepaths)
     tracks = []
     for track_filepath in track_filepaths:
         x, sr = torchaudio.load(track_filepath)
+        x = x[:, : args.max_samples]
         tracks.append(x)
 
+    # add dummy tracks of silence if needed
+
     tracks = torch.stack(tracks, dim=0)
+    tracks = tracks.permute(1, 0, 2)
     print(tracks.shape)
     # tracks have shape (1, num_tracks, seq_len)
 
     # pass to the model
     mix, params = system(tracks)
 
-    print(params)
+    for param in zip(track_filepaths, params.squeeze()):
+        print(track_filepath, param)
 
     # save out the mix
     mix_filepath = args.output
     mix /= mix.abs().max()
+    print(mix.shape)
     torchaudio.save(mix_filepath, mix.view(2, -1), sr)
