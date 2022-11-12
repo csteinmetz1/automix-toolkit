@@ -19,7 +19,7 @@ class MedleyDBDataset(torch.utils.data.Dataset):
         max_num_tracks: int = 16,
         num_examples_per_epoch: int = 1000,
         buffer_size_gb: float = 3.0,
-        buffer_reload_rate: int = 1000,
+        buffer_reload_rate: int = 200,
         normalization: str = "peak",
     ) -> None:
         super().__init__()
@@ -148,10 +148,10 @@ class MedleyDBDataset(torch.utils.data.Dataset):
             x_s = track[:, start_idx:end_idx]
 
             energy = (x_s**2).mean()
-            if energy > 1e-6:  # ensure track is active
+            if energy > 1e-5:  # ensure track is active
                 gain_dB = -12
                 gain_lin = 10 ** (gain_dB / 20.0)
-                x_s /= x_s.abs().max().clamp(1e-8)
+                x_s /= x_s.abs().max().clamp(1e-5)
                 x_s *= gain_lin
 
                 x[tidx, :] = x_s

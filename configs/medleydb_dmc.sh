@@ -14,3 +14,4 @@ CUDA_VISIBLE_DEVICES=2 python scripts/train.py \
 --max_epochs 20 \
 --max_num_tracks 16 \
 --num_workers 2 \
+--gradient_clip_val 1.0 \
