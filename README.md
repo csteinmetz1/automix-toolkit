@@ -78,6 +78,18 @@ You can find shell scripts for each configuration. Note that you will need to up
 
 # Notebooks
 
-- [Inference](notebooks/inference.ipynb)
-- [Training](notebooks/training.ipynb)
-- [Datasets](notebooks/datasets.ipynb)
+We also provide interactive notebooks to demonstrate the functionality of this toolkit. 
+To use the notebooks first ensure you have installed the `automix` package. We suggest using conda or another virtual environemnt system. After installing `automix` package, then install jupyter.
+Then you can launch the notebooks.
+
+```
+python -m venv env 
+source env/bin/activate
+pip install -e .
+pip install jupyter
+jupyter notebook notebooks/
+```
+
+- [Inference](notebooks/inference.ipynb) - In this notebook we demonstrate how to download and use pretrained models to create multitrack mixes of drum recordings. 
+- [Datasets](notebooks/datasets.ipynb) - In this notebook we provide an overview of supplied datasets.
+- [Training](notebooks/training.ipynb) - In this notebook you can train your own model on the ENST-drums dataset. 
