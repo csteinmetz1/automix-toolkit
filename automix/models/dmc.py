@@ -135,7 +135,7 @@ class ShortChunkCNN_Res(torch.nn.Module):
         f_max=8000.0,
         n_mels=128,
         n_class=50,
-        ckpt_path=None,
+        ckpt_path: str = None,
     ):
         super().__init__()
         self.sample_rate = sample_rate
@@ -302,7 +302,12 @@ class DifferentiableMixingConsole(torch.nn.Module):
     Steinmetz et al. (2021). Automatic multitrack mixing with a differentiable mixing console of neural audio effects. ICASSP.
     """
 
-    def __init__(self, sample_rate: int, encoder_arch: str = "short_res") -> None:
+    def __init__(
+        self,
+        sample_rate: int,
+        encoder_arch: str = "short_res",
+        load_weights: bool = False,
+    ) -> None:
         super().__init__()
         self.sample_rate = sample_rate
         self.encoder_arch = encoder_arch
@@ -317,7 +322,8 @@ class DifferentiableMixingConsole(torch.nn.Module):
             self.encoder = OpenL3Encoder(sample_rate)
         elif encoder_arch == "short_res":
             self.encoder = ShortChunkCNN_Res(
-                sample_rate, ckpt_path="./automix/checkpoints/short_res_best_model.pth"
+                sample_rate,
+                ckpt_path="./checkpoints/encoder.ckpt" if load_weights else None,
             )
         else:
             raise ValueError(f"Invalid encoder_arch: {encoder_arch}")
@@ -353,7 +359,7 @@ class DifferentiableMixingConsole(torch.nn.Module):
         c = e.mean(dim=1, keepdim=True)  # (bs, 1, d_embed)
         c = c.repeat(1, num_tracks, 1)  # (bs, num_tracks, d_embed)
 
-        # fuse the track emb and context emb
+        # fuse the track embs and context embs
         ec = torch.cat((e, c), dim=-1)  # (bs, num_tracks, d_embed*2)
 
         # estimate mixing parameters for each track (in parallel)

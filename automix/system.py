@@ -6,7 +6,6 @@ from argparse import ArgumentParser
 
 from automix.models.dmc import DifferentiableMixingConsole
 from automix.models.mixwaveunet import MixWaveUNet
-from automix.models.simple_waveunet import SimpleWaveUNet
 
 
 class System(pl.LightningModule):
@@ -15,12 +14,13 @@ class System(pl.LightningModule):
         self.save_hyperparameters()
 
         # create the model
-        if self.hparams.automix_model == "old-mixwaveunet":
-            self.model = MixWaveUNet(8, self.hparams.train_length)
-        elif self.hparams.automix_model == "mixwaveunet":
-            self.model = SimpleWaveUNet(8, 2)
+        if self.hparams.automix_model == "mixwaveunet":
+            self.model = MixWaveUNet(8, 2)
         elif self.hparams.automix_model == "dmc":
-            self.model = DifferentiableMixingConsole(self.hparams.sample_rate)
+            self.model = DifferentiableMixingConsole(
+                self.hparams.sample_rate,
+                load_weights=self.hparams.pretrained_encoder,
+            )
         else:
             raise RuntimeError(f"Invalid automix_model: {self.hparams.automix_model}")
 
@@ -164,10 +164,10 @@ class System(pl.LightningModule):
         )
 
         scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=self.hparams.max_steps
+            optimizer, T_max=self.hparams.max_epochs
         )
 
-        lr_schedulers = {"scheduler": scheduler, "interval": "step", "frequency": 1}
+        lr_schedulers = {"scheduler": scheduler, "interval": "epoch", "frequency": 1}
 
         return [optimizer], lr_schedulers
 
@@ -183,5 +183,6 @@ class System(pl.LightningModule):
         parser.add_argument("--recon_loss_weights", nargs="+", default=[1.0])
         # --- Model ---
         parser.add_argument("--automix_model", type=str, default="dmc")
+        parser.add_argument("--pretrained_encoder", action="store_true")
 
         return parser

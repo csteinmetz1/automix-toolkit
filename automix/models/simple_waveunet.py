@@ -1,13 +1,15 @@
-import os
 import torch
-import argparse
 import numpy as np
-import pytorch_lightning as pl
 
 
 class DownsamplingBlock(torch.nn.Module):
-    def __init__(self, ch_in: int, ch_out: int, kernel_size: int = 15):
-        super(DownsamplingBlock, self).__init__()
+    def __init__(
+        self,
+        ch_in: int,
+        ch_out: int,
+        kernel_size: int = 15,
+    ):
+        super().__init__()
 
         assert kernel_size % 2 != 0  # kernel must be odd length
         padding = kernel_size // 2  # calculate same padding
@@ -38,9 +40,13 @@ class DownsamplingBlock(torch.nn.Module):
 
 class UpsamplingBlock(torch.nn.Module):
     def __init__(
-        self, ch_in: int, ch_out: int, kernel_size: int = 5, skip: str = "add"
+        self,
+        ch_in: int,
+        ch_out: int,
+        kernel_size: int = 5,
+        skip: str = "add",
     ):
-        super(UpsamplingBlock, self).__init__()
+        super().__init__()
 
         assert kernel_size % 2 != 0  # kernel must be odd length
         padding = kernel_size // 2  # calculate same padding
@@ -75,7 +81,13 @@ class UpsamplingBlock(torch.nn.Module):
         return x
 
 
-class SimpleWaveUNet(torch.nn.Module):
+class MixWaveUNet(torch.nn.Module):
+    """
+
+    Martínez Ramírez M. A., Stoller, D. and Moffat, D., “A deep learning approach to intelligent drum mixing with the Wave-U-Net”
+    Journal of the Audio Engineering Society, vol. 69, no. 3, pp. 142-151, March 2021
+    """
+
     def __init__(
         self,
         ninputs: int,
@@ -99,7 +111,6 @@ class SimpleWaveUNet(torch.nn.Module):
                 ch_out = ch_in * ch_growth
 
             self.encoder.append(DownsamplingBlock(ch_in, ch_out, kernel_size=ds_kernel))
-            print("ds", n, ch_in, ch_out)
 
         self.embedding = torch.nn.Conv1d(ch_out, ch_out, kernel_size=1)
 
@@ -120,7 +131,6 @@ class SimpleWaveUNet(torch.nn.Module):
                     skip=skip,
                 )
             )
-            print("us", n, ch_in, ch_out)
 
         self.output_conv = torch.nn.Conv1d(
             ch_out,
@@ -129,8 +139,7 @@ class SimpleWaveUNet(torch.nn.Module):
             padding=out_kernel // 2,
         )
 
-    def forward(self, x):
-
+    def forward(self, x: torch.Tensor, track_mask: torch.Tensor = None):
         x_in = x
         skips = []
 
