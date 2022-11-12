@@ -1,0 +1,13 @@
+CUDA_VISIBLE_DEVICES=3 python scripts/train.py \
+--dataset_dir "/import/c4dm-datasets-ext/DSD100" \
+--dataset_name "DSD100" \
+--log_dir "/import/c4dm-datasets-ext/automix-toolkit" \
+--automix_model "dmc" \
+--pretrained_encoder \
+--train_length 262144 \
+--val_length 262144 \
+--accelerator gpu \
+--devices 1 \
+--batch_size 16 \
+--lr 3e-4 \
+--max_epochs 100 \

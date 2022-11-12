@@ -9,7 +9,7 @@ from pytorch_lightning.loggers import WandbLogger
 
 from automix.system import System
 from automix.callbacks import LogAudioCallback
-from automix.data import ENSTDrumsDataset, MedleyDBDataset
+from automix.data import ENSTDrumsDataset, MedleyDBDataset, DSD100Dataset
 from automix.callbacks import LogAudioCallback
 
 
@@ -85,6 +85,31 @@ if __name__ == "__main__":
         train_set = train_dataset.mix_filepaths
         val_set = val_dataset.mix_filepaths
         test_set = test_dataset.mix_filepaths
+    elif args.dataset_name == "DSD100":
+        train_dataset = DSD100Dataset(
+            args.dataset_dirs[0],
+            args.train_length,
+            44100,
+            indices=[0, 80],
+            num_examples_per_epoch=1000,
+        )
+        val_dataset = DSD100Dataset(
+            args.dataset_dirs[0],
+            args.train_length,
+            44100,
+            indices=[80, 90],
+            num_examples_per_epoch=100,
+        )
+        test_dataset = DSD100Dataset(
+            args.dataset_dirs[0],
+            args.train_length,
+            44100,
+            indices=[90, 100],
+            num_examples_per_epoch=100,
+        )
+        train_set = train_dataset.mix_dirs
+        val_set = val_dataset.mix_dirs
+        test_set = test_dataset.mix_dirs
     elif args.dataset_name == "MedleyDB":
         train_dataset = MedleyDBDataset(
             args.dataset_dirs,
