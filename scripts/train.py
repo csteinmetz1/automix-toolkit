@@ -57,7 +57,8 @@ if __name__ == "__main__":
     # create the System
     system = System(**vars(args))
 
-    if args.dataset_name == "ENST-drums":
+    if "ENST-drums" in args.dataset_name:
+        wet_mix = True if "wet" in args.dataset_name else False
         train_dataset = ENSTDrumsDataset(
             args.dataset_dirs[0],
             args.train_length,
@@ -65,6 +66,7 @@ if __name__ == "__main__":
             drummers=[1, 2, 3],
             indices=[0, 168],
             num_examples_per_epoch=1000,
+            wet_mix=wet_mix,
         )
         val_dataset = ENSTDrumsDataset(
             args.dataset_dirs[0],
@@ -73,6 +75,7 @@ if __name__ == "__main__":
             drummers=[1, 2, 3],
             indices=[168, 189],
             num_examples_per_epoch=100,
+            wet_mix=wet_mix,
         )
         test_dataset = ENSTDrumsDataset(
             args.dataset_dirs[0],
@@ -81,6 +84,7 @@ if __name__ == "__main__":
             drummers=[1, 2, 3],
             indices=[189, 210],
             num_examples_per_epoch=100,
+            wet_mix=wet_mix,
         )
         train_set = train_dataset.mix_filepaths
         val_set = val_dataset.mix_filepaths
