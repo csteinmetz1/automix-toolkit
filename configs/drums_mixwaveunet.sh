@@ -9,5 +9,4 @@ CUDA_VISIBLE_DEVICES=1 python scripts/train.py \
 --devices 1 \
 --batch_size 14 \
 --lr 3e-4 \
---max_epochs 1000 \
---max_steps 100000 \
+--max_epochs 100 \

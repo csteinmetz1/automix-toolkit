@@ -3,11 +3,11 @@ CUDA_VISIBLE_DEVICES=0 python scripts/train.py \
 --dataset_name "ENST-drums" \
 --log_dir "/import/c4dm-datasets-ext/automix-toolkit" \
 --automix_model "dmc" \
+--pretrained_encoder \
 --train_length 262144 \
 --val_length 262144 \
 --accelerator gpu \
 --devices 1 \
 --batch_size 16 \
 --lr 3e-4 \
---max_epochs 1000 \
---max_steps 100000 \
+--max_epochs 100 \

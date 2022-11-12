@@ -11,7 +11,6 @@ CUDA_VISIBLE_DEVICES=2 python scripts/train.py \
 --devices 1 \
 --batch_size 8 \
 --lr 1e-4 \
---max_epochs 200 \
---max_steps 100000 \
+--max_epochs 20 \
 --max_num_tracks 16 \
 --num_workers 2 \
