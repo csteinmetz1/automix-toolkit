@@ -1,4 +1,3 @@
-
 from distutils.core import setup
 
 setup(
@@ -20,5 +19,6 @@ setup(
         "pedalboard",
         "scipy",
         "auraloss",
+        "wget",
     ],
 )
