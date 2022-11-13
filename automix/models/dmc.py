@@ -1,33 +1,7 @@
 import torch
 import torchaudio
-import torchopenl3
 
 from automix.utils import restore_from_0to1
-
-
-class OpenL3Encoder(torch.nn.Module):
-    def __init__(self, sample_rate: float) -> None:
-        super().__init__()
-        self.sample_rate = sample_rate
-        self.model = torchopenl3.models.load_audio_embedding_model(
-            input_repr="mel128",
-            content_type="music",
-            embedding_size=512,
-        )
-        self.d_embed = 512
-
-    def forward(self, x: torch.Tensor):
-        with torch.no_grad():
-            emb, ts = torchopenl3.get_audio_embedding(
-                x,
-                self.sample_rate,
-                model=self.model,
-                sampler="julian",
-                hop_size=1.0,
-                batch_size=64,
-            )
-            emb = emb.mean(dim=1)
-        return emb
 
 
 class VGGishEncoder(torch.nn.Module):
