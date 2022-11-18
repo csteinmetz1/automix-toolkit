@@ -292,8 +292,6 @@ class DifferentiableMixingConsole(torch.nn.Module):
         # Simple 2D CNN on spectrograms
         if encoder_arch == "vggish":
             self.encoder = VGGishEncoder(sample_rate)
-        elif encoder_arch == "openl3":
-            self.encoder = OpenL3Encoder(sample_rate)
         elif encoder_arch == "short_res":
             self.encoder = ShortChunkCNN_Res(
                 sample_rate,
@@ -307,6 +305,58 @@ class DifferentiableMixingConsole(torch.nn.Module):
             self.mixer.num_params,
             self.encoder.d_embed * 2,
         )
+
+    def block_based_forward(
+        self,
+        x: torch.Tensor,
+        block_size: int,
+        hop_length: int,
+    ):
+        bs, num_tracks, seq_len = x.size()
+
+        x = torch.nn.functional.pad(
+            x,
+            (block_size // 2, block_size // 2),
+            mode="reflect",
+        )
+
+        unfold_fn = torch.nn.Unfold(
+            (1, block_size),
+            stride=(1, hop_length),
+        )
+        fold_fn = torch.nn.Fold(
+            (1, x.shape[-1]),
+            (1, block_size),
+            stride=(1, hop_length),
+        )
+        window = torch.hann_window(block_size)
+        window = window.view(1, 1, -1)
+        window = window.type_as(x)
+
+        x_track_blocks = []
+        for track_idx in range(num_tracks):
+            x_track_blocks.append(unfold_fn(x[:, track_idx, :].view(bs, 1, 1, -1)))
+
+        x_blocks = torch.stack(x_track_blocks, dim=1)
+        num_blocks = x_blocks.shape[-1]
+
+        block_outputs = []
+        for block_idx in range(num_blocks):
+            x_block = x_blocks[..., block_idx]
+            x_result, _ = self.forward(x_block)
+            x_result = x_result.view(bs, 1, 2, -1)
+            block_outputs.append(x_result)
+
+        block_outputs = torch.cat(block_outputs, dim=1)
+        block_outputs = block_outputs * window  # apply overlap-add window
+        y_left = fold_fn(block_outputs[:, :, 0, :].permute(0, 2, 1))
+        y_right = fold_fn(block_outputs[:, :, 1, :].permute(0, 2, 1))
+        y = torch.cat((y_left, y_right), dim=1)
+
+        # crop the padded areas
+        y = y[..., block_size // 2 : -(block_size // 2)]
+
+        return y
 
     def forward(self, x: torch.Tensor, track_mask: torch.Tensor = None):
         """Given a set of tracks, analyze them with a shared encoder, predict a set of mixing parameters,
