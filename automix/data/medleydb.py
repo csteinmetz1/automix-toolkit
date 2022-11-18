@@ -73,6 +73,9 @@ class MedleyDBDataset(torch.utils.data.Dataset):
             # now find all the track filepaths
             track_filepaths = glob.glob(os.path.join(mix_dir, f"{mix_id}_RAW", "*.wav"))
 
+            if len(track_filepaths) > self.max_num_tracks:
+                continue
+
             # check length of each track
             tracks = []
             for tidx, track_filepath in enumerate(track_filepaths):
@@ -138,7 +141,7 @@ class MedleyDBDataset(torch.utils.data.Dataset):
 
             y /= y.abs().max()
 
-        # -------------------- load the tracks from disk --------------------
+        # -------------------- load the tracks from RAM --------------------
         x = torch.zeros((self.max_num_tracks, self.length))
         pad = [True] * self.max_num_tracks  # note which tracks are empty
         random.shuffle(example["track_audio"])  # load random tracks each time
@@ -148,10 +151,13 @@ class MedleyDBDataset(torch.utils.data.Dataset):
             x_s = track[:, start_idx:end_idx]
 
             energy = (x_s**2).mean()
-            if energy > 1e-5:  # ensure track is active
-                gain_dB = -12
+
+            if energy > 1e-8:  # ensure track is active
+                gain_dB = np.random.rand() * 12
+                gain_factor = 1 if np.random.rand() > 0.5 else -1
+                gain_dB *= gain_factor
                 gain_lin = 10 ** (gain_dB / 20.0)
-                x_s /= x_s.abs().max().clamp(1e-5)
+
                 x_s *= gain_lin
 
                 x[tidx, :] = x_s
