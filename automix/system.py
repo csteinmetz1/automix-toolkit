@@ -38,6 +38,8 @@ class System(pl.LightningModule):
                 )
             elif recon_loss == "l1":
                 self.recon_losses[recon_loss] = torch.nn.L1Loss()
+            elif recon_loss == "sisdr":
+                self.recon_losses[recon_loss] = auraloss.time.SISDRLoss()
             elif recon_loss == "sd":
                 self.recon_losses[recon_loss] = auraloss.freq.SumAndDifferenceSTFTLoss(
                     fft_sizes=[4096, 1024, 256],
@@ -163,9 +165,20 @@ class System(pl.LightningModule):
             betas=(0.9, 0.999),
         )
 
-        scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
-            optimizer, T_max=self.hparams.max_epochs
-        )
+        if self.hparams.schedule == "cosine":
+            scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(
+                optimizer, T_max=self.hparams.max_epochs
+            )
+        elif self.hparams.schedule == "step":
+            scheduler = torch.optim.lr_scheduler.MultiStepLR(
+                optimizer,
+                [
+                    int(self.hparams.max_epochs * 0.85),
+                    int(self.hparams.max_epochs * 0.95),
+                ],
+            )
+        else:
+            return optimizer
 
         lr_schedulers = {"scheduler": scheduler, "interval": "epoch", "frequency": 1}
 
@@ -181,6 +194,7 @@ class System(pl.LightningModule):
         # --- Loss functions  ---
         parser.add_argument("--recon_losses", nargs="+", default=["sd"])
         parser.add_argument("--recon_loss_weights", nargs="+", default=[1.0])
+        parser.add_argument("--schedule", type=str, default="cosine")
         # --- Model ---
         parser.add_argument("--automix_model", type=str, default="dmc")
         parser.add_argument("--pretrained_encoder", action="store_true")
