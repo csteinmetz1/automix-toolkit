@@ -95,20 +95,20 @@ class MixWaveUNet(torch.nn.Module):
         ds_kernel: int = 13,
         us_kernel: int = 13,
         out_kernel: int = 5,
-        layers: int = 6,
-        ch_start: int = 16,
-        ch_growth: int = 2,
-        skip: str = "add",
+        layers: int = 12,
+        ch_growth: int = 24,
+        skip: str = "concat",
     ):
         super().__init__()
         self.encoder = torch.nn.ModuleList()
         for n in np.arange(layers):
+
             if n == 0:
                 ch_in = ninputs
-                ch_out = ch_start
+                ch_out = ch_growth
             else:
                 ch_in = ch_out
-                ch_out = ch_in * ch_growth
+                ch_out = ch_in + ch_growth
 
             self.encoder.append(DownsamplingBlock(ch_in, ch_out, kernel_size=ds_kernel))
 
@@ -118,7 +118,10 @@ class MixWaveUNet(torch.nn.Module):
         for n in np.arange(layers, stop=0, step=-1):
 
             ch_in = ch_out
-            ch_out = int(ch_in / ch_growth)
+            ch_out = ch_in - ch_growth
+
+            if ch_out < ch_growth:
+                ch_out = ch_growth
 
             if skip == "concat":
                 ch_in *= 2
@@ -133,7 +136,7 @@ class MixWaveUNet(torch.nn.Module):
             )
 
         self.output_conv = torch.nn.Conv1d(
-            ch_out,
+            ch_out + ninputs,
             noutputs,
             kernel_size=out_kernel,
             padding=out_kernel // 2,
@@ -152,6 +155,8 @@ class MixWaveUNet(torch.nn.Module):
         for dec in self.decoder:
             skip = skips.pop()
             x = dec(x, skip)
+
+        x = torch.cat((x_in, x), dim=1)
 
         y = self.output_conv(x)
 
