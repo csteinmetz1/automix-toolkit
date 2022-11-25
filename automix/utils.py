@@ -1,6 +1,22 @@
 import torch
 
 
+def count_parameters(model, trainable_only=True):
+
+    if trainable_only:
+        if len(list(model.parameters())) > 0:
+            params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+        else:
+            params = 0
+    else:
+        if len(list(model.parameters())) > 0:
+            params = sum(p.numel() for p in model.parameters())
+        else:
+            params = 0
+
+    return params
+
+
 def center_crop(x: torch.Tensor, length: int):
     start = (x.shape[-1] - length) // 2
     stop = start + length
