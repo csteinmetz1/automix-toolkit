@@ -131,3 +131,5 @@ dmypy.json
 audio/
 wandb/
 *.ckpt
+.DS_Store
+*.wav

@@ -1,5 +1,7 @@
 <div align="center">
 
+<img width="80px" src="docs/assets/logo.png"> 
+
 # automix-toolkit
 Models and datasets for training deep learning automatic mixing models
 
@@ -14,10 +16,10 @@ pip install --upgrade pip
 ```
 
 ```
+git clone https://github.com/csteinmetz1/automix-toolkit.git
+cd automix-toolkit
 pip install -e . 
 ```
-
-Eventually we want `pip install automix`
 
 # Usage
 
@@ -55,7 +57,7 @@ python scripts/inference.py checkpoints/enst-drums-dmc.ckpt drums-test-rock/trac
 
 | Name         | Mixes | Size (GB)    | Download | 
 |--------------|-------|--------------|----------|
-| ENST-Drums   | 210   |  20 GB       | [link](https://perso.telecom-paristech.fr/grichard/ENST-drums/) |
+| ENST-Drums   | 210   | 20 GB        | [link](https://perso.telecom-paristech.fr/grichard/ENST-drums/) |
 | MedleyDB     | 197   | 82 + 71 GB   | [link](https://medleydb.weebly.com/) |
 | DSD100       | 100   | 14 GB        | [link](http://liutkus.net/DSD100.zip) |
 | DSD100subset |   4   | 0.1 GB       | [link](https://www.loria.fr/~aliutkus/DSD100subset.zip)
