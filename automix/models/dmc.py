@@ -142,7 +142,7 @@ class ShortChunkCNN_Res(torch.nn.Module):
         self.relu = torch.nn.ReLU()
 
         if ckpt_path is not None:
-            checkpoint = torch.load(ckpt_path)
+            checkpoint = torch.load(ckpt_path, map_location="cpu")
             self.load_state_dict(checkpoint)
             print(f"Loaded weights from {ckpt_path}")
 
@@ -192,10 +192,10 @@ class PostProcessor(torch.nn.Module):
         super().__init__()
         self.mlp = torch.nn.Sequential(
             torch.nn.Linear(d_embed, 256),
-            # torch.nn.Dropout(0.1),
+            torch.nn.Dropout(0.2),
             torch.nn.PReLU(),
             torch.nn.Linear(256, 256),
-            # torch.nn.Dropout(0.1),
+            torch.nn.Dropout(0.2),
             torch.nn.PReLU(),
             torch.nn.Linear(256, num_params),
             torch.nn.Sigmoid(),
