@@ -1,4 +1,5 @@
-from distutils.core import setup
+# from distutils.core import setup
+from setuptools import setup, find_packages
 
 setup(
     name="automix-toolkit",
@@ -7,7 +8,7 @@ setup(
     author="Christian J. Steinmetz",
     author_email="c.j.steinmetz@qmul.ac.uk",
     url="https://github.com/csteinmetz1/automix",
-    packages=["automix"],
+    packages=find_packages(),
     install_requires=[
         "torch",
         "torchvision",
@@ -22,6 +23,6 @@ setup(
         "wget",
         "soxbindings",
         "pyloudnorm",
-        "sklearn"
+        "sklearn",
     ],
 )
