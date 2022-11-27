@@ -133,3 +133,5 @@ wandb/
 *.ckpt
 .DS_Store
 *.wav
+*.zip
+*__MACOSX
