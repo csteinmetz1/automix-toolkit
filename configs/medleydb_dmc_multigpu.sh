@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=2 python scripts/train.py \
+CUDA_VISIBLE_DEVICES=1,2 python scripts/train.py \
 --dataset_dir \
 "/import/c4dm-datasets/MedleyDB_V1/V1" \
 "/import/c4dm-datasets/MedleyDB_V2/V2" \
@@ -8,11 +8,11 @@ CUDA_VISIBLE_DEVICES=2 python scripts/train.py \
 --train_length 131072 \
 --val_length 131072 \
 --accelerator gpu \
---devices 1 \
+--devices 2 \
 --batch_size 16 \
 --lr 1e-4 \
 --max_epochs 200 \
---max_num_tracks 16 \
---num_workers 2 \
+--max_num_tracks 8 \
+--num_workers 1 \
 --gradient_clip_val 1.0 \
---schedule "step" \
+--schedule "cosine" \
