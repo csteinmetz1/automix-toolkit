@@ -1,6 +1,6 @@
-CUDA_VISIBLE_DEVICES=3 python scripts/train.py \
+CUDA_VISIBLE_DEVICES=2 python scripts/train.py \
 --dataset_dir "/import/c4dm-datasets/ENST-drums" \
---dataset_name "ENST-drums" \
+--dataset_name "ENST-drums-wet" \
 --log_dir "/import/c4dm-datasets-ext/automix-toolkit" \
 --automix_model "mixwaveunet" \
 --train_length 131072 \
@@ -9,6 +9,6 @@ CUDA_VISIBLE_DEVICES=3 python scripts/train.py \
 --devices 1 \
 --batch_size 16 \
 --lr 3e-4 \
---max_epochs 250 \
+--max_epochs 500 \
 --schedule "step" \
 --recon_losses "l1" \

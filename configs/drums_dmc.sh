@@ -10,4 +10,6 @@ CUDA_VISIBLE_DEVICES=0 python scripts/train.py \
 --devices 1 \
 --batch_size 16 \
 --lr 3e-4 \
---max_epochs 100 \
+--max_epochs 250 \
+--schedule "step" \
+--recon_losses "l1" \
