@@ -1,4 +1,3 @@
-import sox
 import warnings
 import pyloudnorm as pyln
 import sklearn
@@ -672,18 +671,10 @@ def get_features(target, output, sr=44100,
     features = {}
     x = target.T
     y = output.T
-
-    tfm = sox.Transformer()
-    tfm.silence(location=1)
-    x = tfm.build_array(input_array=x, sample_rate_in=sr)
-    if y.shape[0] != x.shape[0]:
-        y = y[np.abs(y.shape[0]-x.shape[0]):, :]
-    assert x.shape == y.shape
-    tfm = sox.Transformer()
-    tfm.silence(location=-1)
-    x = tfm.build_array(input_array=x, sample_rate_in=sr)
-    if y.shape[0] != x.shape[0]:
-        y = y[:-np.abs(y.shape[0]-x.shape[0]), :]
+    
+    x, idx = librosa.effects.trim(x.T, top_db=45, frame_length=4096, hop_length=1024)
+    x = x.T
+    y = y[idx[0]:idx[1],:]
     assert x.shape == y.shape
     
     # Compute Loudness features
