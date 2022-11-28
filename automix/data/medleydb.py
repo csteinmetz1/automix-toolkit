@@ -18,8 +18,9 @@ class MedleyDBDataset(torch.utils.data.Dataset):
         indices: List[int] = [0, 100],
         max_num_tracks: int = 16,
         num_examples_per_epoch: int = 1000,
-        buffer_size_gb: float = 3.0,
-        buffer_reload_rate: int = 200,
+        buffer_size_gb: float = 2.0,
+        buffer_reload_rate: int = 4000,
+        buffer_audio_length: int = 262144,
         normalization: str = "peak",
     ) -> None:
         super().__init__()
@@ -31,6 +32,7 @@ class MedleyDBDataset(torch.utils.data.Dataset):
         self.num_examples_per_epoch = num_examples_per_epoch
         self.buffer_size_gb = buffer_size_gb
         self.buffer_reload_rate = buffer_reload_rate
+        self.buffer_audio_length = buffer_audio_length
         self.normalization = normalization
 
         self.mix_dirs = []
@@ -42,7 +44,17 @@ class MedleyDBDataset(torch.utils.data.Dataset):
             mix_dirs = sorted(mix_dirs)  # sort
             self.mix_dirs += mix_dirs
 
+        print(len(self.mix_dirs))
+        for mix_dir in tqdm(self.mix_dirs):
+            mix_id = os.path.basename(mix_dir)
+            track_filepaths = glob.glob(os.path.join(mix_dir, f"{mix_id}_RAW", "*.wav"))
+            # remove all mixes that have more tracks than requested
+            if len(track_filepaths) > self.max_num_tracks:
+                self.mix_dirs.remove(mix_dir)
+
+        print(len(self.mix_dirs))
         self.mix_dirs = self.mix_dirs[indices[0] : indices[1]]  # select subset
+        print(len(self.mix_dirs))
         self.items_since_load = self.buffer_reload_rate
 
     def reload_buffer(self):
@@ -55,55 +67,85 @@ class MedleyDBDataset(torch.utils.data.Dataset):
         random.shuffle(self.mix_dirs)
 
         # load files into RAM
-        for mix_dir in self.mix_dirs:
-            mix_id = os.path.basename(mix_dir)
-            mix_filepath = glob.glob(os.path.join(mix_dir, "*.wav"))[0]
+        while nbytes_loaded < self.buffer_size_gb * 1e9:
+            for mix_dir in tqdm(self.mix_dirs):
+                mix_id = os.path.basename(mix_dir)
+                mix_filepath = glob.glob(os.path.join(mix_dir, "*.wav"))[0]
 
-            # now check the length of the mix
-            try:
-                y, sr = torchaudio.load(mix_filepath)
-            except:
-                print(f"Skipping {mix_filepath}")
-                continue
+                if "AimeeNorwich_Child" in mix_filepath:
+                    continue
 
-            mix_num_frames = y.shape[-1]
-            nbytes = y.element_size() * y.nelement()
-            nbytes_loaded += nbytes
+                # save only a random subset of this song so we can load more songs
+                silent = True
+                counter = 0
+                while silent:
 
-            # now find all the track filepaths
-            track_filepaths = glob.glob(os.path.join(mix_dir, f"{mix_id}_RAW", "*.wav"))
+                    num_frames = torchaudio.info(mix_filepath).num_frames
 
-            if len(track_filepaths) > self.max_num_tracks:
-                continue
+                    offset = np.random.randint(
+                        0,
+                        num_frames - self.buffer_audio_length - 1,
+                    )
 
-            # check length of each track
-            tracks = []
-            for tidx, track_filepath in enumerate(track_filepaths):
-                x, sr = torchaudio.load(track_filepath)
-                tracks.append(x)
+                    # now check the length of the mix
+                    y, sr = torchaudio.load(
+                        mix_filepath,
+                        frame_offset=offset,
+                        num_frames=self.buffer_audio_length,
+                    )
 
-                nbytes = x.element_size() * x.nelement()
+                    energy = (y**2).mean()
+                    print(energy)
+                    if energy > 1e-3:
+                        silent = False
+
+                    counter += 1
+                    if counter > 10:
+                        break
+
+                if silent:
+                    continue
+
+                mix_num_frames = y.shape[-1]
+                nbytes = y.element_size() * y.nelement()
                 nbytes_loaded += nbytes
 
-                track_num_frames = x.shape[-1]
-                if track_num_frames < mix_num_frames:
-                    mix_num_frames = track_num_frames
+                # now find all the track filepaths
+                track_filepaths = glob.glob(
+                    os.path.join(mix_dir, f"{mix_id}_RAW", "*.wav")
+                )
 
-            # store this example
-            example = {
-                "mix_id": os.path.dirname(mix_filepath).split(os.sep)[-1],
-                "mix_filepath": mix_filepath,
-                "mix_audio": y,
-                "num_frames": mix_num_frames,
-                "track_filepaths": track_filepaths,
-                "track_audio": tracks,
-            }
+                # check length of each track
+                tracks = []
+                for tidx, track_filepath in enumerate(track_filepaths):
+                    x, sr = torchaudio.load(
+                        track_filepath,
+                        frame_offset=offset,
+                        num_frames=self.buffer_audio_length,
+                    )
+                    tracks.append(x)
 
-            self.examples.append(example)
+                    nbytes = x.element_size() * x.nelement()
+                    nbytes_loaded += nbytes
 
-            # check the size of loaded data
-            if nbytes_loaded > self.buffer_size_gb * 1e9:
-                break
+                # store this example
+                example = {
+                    "mix_id": os.path.dirname(mix_filepath).split(os.sep)[-1],
+                    "mix_filepath": mix_filepath,
+                    "mix_audio": y,
+                    "num_frames": mix_num_frames,
+                    "track_filepaths": track_filepaths,
+                    "track_audio": tracks,
+                }
+
+                self.examples.append(example)
+
+                # check the size of loaded data
+                if nbytes_loaded > self.buffer_size_gb * 1e9:
+                    break
+
+        print(len(self.examples))
+        print()
 
     def __len__(self):
         return self.num_examples_per_epoch
@@ -117,54 +159,62 @@ class MedleyDBDataset(torch.utils.data.Dataset):
         if self.items_since_load > self.buffer_reload_rate:
             self.reload_buffer()
 
-        # select an example at random
-        example_idx = np.random.randint(0, len(self.examples))
-        example = self.examples[example_idx]
-
         silent = True
-        counter = 0
-        while silent:
+        no_active_tracks = True
+        while silent or no_active_tracks:
+            # select an example at random
+            example_idx = np.random.randint(0, len(self.examples))
+            example = self.examples[example_idx]
+
             # get the whole mix
-            y = example["mix_audio"]
-
-            # get random offset
-            start_idx = np.random.randint(0, example["num_frames"] - self.length - 1)
-            end_idx = start_idx + self.length
-            y = y[:, start_idx:end_idx]
-
+            y = example["mix_audio"].clone()
             energy = (y**2).mean()
 
-            if y.shape[-1] == self.length and energy > 1e-4:
+            if y.shape[-1] == self.length and energy > 1e-3:
                 silent = False
+            else:
+                continue
 
-            counter += 1
+            # -------------------- load the tracks from RAM --------------------
+            x = torch.zeros((self.max_num_tracks, self.length))
+            pad = [True] * self.max_num_tracks  # note which tracks are empty
+            random.shuffle(example["track_audio"])  # load random tracks each time
 
-            y /= y.abs().max()
+            track_energy = []
+            for track_idx, track in enumerate(example["track_audio"]):
+                energy = (track**2).mean()
+                track_energy.append((track_idx, energy))
 
-        # -------------------- load the tracks from RAM --------------------
-        x = torch.zeros((self.max_num_tracks, self.length))
-        pad = [True] * self.max_num_tracks  # note which tracks are empty
-        random.shuffle(example["track_audio"])  # load random tracks each time
+            # sort tracks based on energy
+            track_energy = sorted(track_energy, key=lambda x: x[1], reverse=True)
 
-        tidx = 0
-        for track in example["track_audio"]:
-            x_s = track[:, start_idx:end_idx]
+            tidx = 0
+            for track_idx, energy in track_energy:
+                if energy > 1e-4:  # ensure track is active
 
-            energy = (x_s**2).mean()
+                    x_s = example["track_audio"][track_idx].clone()
 
-            if energy > 1e-8:  # ensure track is active
-                gain_dB = np.random.rand() * 12
-                gain_factor = 1 if np.random.rand() > 0.5 else -1
-                gain_dB *= gain_factor
-                gain_lin = 10 ** (gain_dB / 20.0)
+                    # could also try loudness normalization next
+                    x_s /= x_s.abs().max().clamp(1e-6)
+                    x_s *= 10 ** (-12 / 20.0)
 
-                x_s *= gain_lin
+                    # gain_dB = np.random.rand() * 12
+                    # gain_factor = 1 if np.random.rand() > 0.5 else -1
+                    # gain_dB *= gain_factor
+                    # gain_lin = 10 ** (gain_dB / 20.0)
 
-                x[tidx, :] = x_s
-                pad[tidx] = False
-                tidx += 1
+                    # x_s *= gain_lin
 
-            if (tidx + 1) >= self.max_num_tracks:
-                break
+                    x[tidx, :] = x_s
+                    pad[tidx] = False
+                    tidx += 1
 
-        return x, y, pad
+                if (tidx + 1) >= self.max_num_tracks:
+                    break
+
+            if tidx > 0:
+                no_active_tracks = False
+
+        assert tidx > 0  # no tracks are loaded
+
+        return x, y, torch.tensor(pad)
