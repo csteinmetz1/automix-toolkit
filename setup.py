@@ -21,7 +21,6 @@ setup(
         "scipy",
         "auraloss",
         "wget",
-        "soxbindings",
         "pyloudnorm",
         "sklearn",
     ],
