@@ -11,8 +11,8 @@ CUDA_VISIBLE_DEVICES=3 python scripts/train.py \
 --devices 1 \
 --batch_size 16 \
 --lr 1e-4 \
---max_epochs 200 \
---max_num_tracks 8 \
---num_workers 4 \
+--max_epochs 400 \
+--max_num_tracks 16 \
+--num_workers 8 \
 --gradient_clip_val 1.0 \
 --schedule "cosine" \

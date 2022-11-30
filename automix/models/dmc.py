@@ -372,6 +372,10 @@ class DifferentiableMixingConsole(torch.nn.Module):
         """
         bs, num_tracks, seq_len = x.size()
 
+        # if no track_mask supplied assume all tracks active
+        if track_mask is None:
+            track_mask = torch.zeros(bs, num_tracks).type_as(x)
+
         # move tracks to the batch dimension to fully parallelize embedding computation
         x = x.view(bs * num_tracks, -1)
 
@@ -380,8 +384,14 @@ class DifferentiableMixingConsole(torch.nn.Module):
         e = e.view(bs, num_tracks, -1)  # (bs, num_tracks, d_embed)
 
         # generate the "context" embedding
-        c = e.mean(dim=1, keepdim=True)  # (bs, 1, d_embed)
-        c = c.repeat(1, num_tracks, 1)  # (bs, num_tracks, d_embed)
+        c = []
+        for bidx in range(bs):
+            c_n = e[bidx, ~track_mask[bidx, :], :].mean(
+                dim=0, keepdim=True
+            )  # (bs, 1, d_embed)
+            c_n = c_n.repeat(num_tracks, 1)  # (bs, num_tracks, d_embed)
+            c.append(c_n)
+        c = torch.stack(c, dim=0)
 
         # fuse the track embs and context embs
         ec = torch.cat((e, c), dim=-1)  # (bs, num_tracks, d_embed*2)
