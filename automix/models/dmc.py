@@ -372,6 +372,10 @@ class DifferentiableMixingConsole(torch.nn.Module):
         """
         bs, num_tracks, seq_len = x.size()
 
+        # if no track_mask supplied assume all tracks active
+        if track_mask is None:
+            track_mask = torch.zeros(bs, num_tracks).type_as(x)
+
         # move tracks to the batch dimension to fully parallelize embedding computation
         x = x.view(bs * num_tracks, -1)
 
