@@ -135,3 +135,5 @@ wandb/
 *.wav
 *.zip
 *__MACOSX
+notebooks/lightning_logs/
+notebooks/DSD100*
