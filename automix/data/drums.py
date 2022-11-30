@@ -135,4 +135,4 @@ class ENSTDrumsDataset(torch.utils.data.Dataset):
                 x[tidx, :] = x_s
                 pad[tidx] = False
 
-        return x, y, pad
+        return x, y, torch.tensor(pad)
