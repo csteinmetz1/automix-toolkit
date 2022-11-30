@@ -113,4 +113,4 @@ class DSD100Dataset(torch.utils.data.Dataset):
                 pad[tidx] = False
                 tidx += 1
 
-        return x, y, pad
+        return x, y, torch.tensor(pad)
