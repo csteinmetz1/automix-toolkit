@@ -119,7 +119,7 @@ if __name__ == "__main__":
             args.dataset_dirs,
             args.train_length,
             44100,
-            indices=[0, 156],
+            indices=[0, 100],
             max_num_tracks=args.max_num_tracks,
             num_examples_per_epoch=10000,
         )
@@ -127,7 +127,7 @@ if __name__ == "__main__":
             args.dataset_dirs,
             args.val_length,
             44100,
-            indices=[156, 175],
+            indices=[100, 130],
             max_num_tracks=args.max_num_tracks,
             num_examples_per_epoch=100,
         )
@@ -135,7 +135,7 @@ if __name__ == "__main__":
             args.dataset_dirs,
             args.val_length,
             44100,
-            indices=[175, 197],
+            indices=[100, 130],
             max_num_tracks=args.max_num_tracks,
             num_examples_per_epoch=100,
         )
@@ -161,13 +161,15 @@ if __name__ == "__main__":
         shuffle=False,
         num_workers=args.num_workers,
         persistent_workers=True,
+        #pin_memory=True,
     )
     val_dataloader = torch.utils.data.DataLoader(
         val_dataset,
         batch_size=args.batch_size,
         shuffle=False,
-        num_workers=args.num_workers,
-        persistent_workers=False,
+        num_workers=1,
+        persistent_workers=True,
+        #pin_memory=True, # does this help or hurt? 
     )
 
     # train!
