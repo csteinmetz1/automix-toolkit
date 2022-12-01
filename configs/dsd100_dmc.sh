@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=3 python scripts/train.py \
+CUDA_VISIBLE_DEVICES=4 python scripts/train.py \
 --dataset_dir "/import/c4dm-datasets-ext/DSD100" \
 --dataset_name "DSD100" \
 --log_dir "/import/c4dm-datasets-ext/automix-toolkit" \

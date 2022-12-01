@@ -15,7 +15,7 @@ class System(pl.LightningModule):
 
         # create the model
         if self.hparams.automix_model == "mixwaveunet":
-            self.model = MixWaveUNet(8, 2)
+            self.model = MixWaveUNet(self.hparams.max_num_tracks, 2)
         elif self.hparams.automix_model == "dmc":
             self.model = DifferentiableMixingConsole(
                 self.hparams.sample_rate,
