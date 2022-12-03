@@ -112,7 +112,7 @@ def get_lufs_peak_frames(x, sr, frame_size, hop_size):
         peak_db = 20.0 * np.log10(peak)
         peak_.append(peak_db)
 
-        meter = pyln.Meter(sr) # create BS.1770 meter
+        meter = pyln.Meter(sr, block_size=0.4) # create BS.1770 meter
         loudness = meter.integrated_loudness(x_.T)
         loudness_.append(loudness)
     peak_ = np.asarray(peak_)
@@ -146,12 +146,22 @@ def compute_loudness_features(audio_out, audio_tar, sr, frame_size, hop_size):
     
     eps = 1e-10
     N = 40 # Considers previous 40 frames
-    mean_peak_tar, std_peak_tar = get_running_stats(peak_tar+eps, [0], N=N)
-    mean_peak_out, std_peak_out = get_running_stats(peak_out+eps, [0], N=N)
+    
+    if peak_tar.shape[0] > N:
+        
+        mean_peak_tar, std_peak_tar = get_running_stats(peak_tar+eps, [0], N=N)
+        mean_peak_out, std_peak_out = get_running_stats(peak_out+eps, [0], N=N)
 
-    mean_lufs_tar, std_lufs_tar = get_running_stats(loudness_tar+eps, [0], N=N)
-    mean_lufs_out, std_lufs_out = get_running_stats(loudness_out+eps, [0], N=N)
-
+        mean_lufs_tar, std_lufs_tar = get_running_stats(loudness_tar+eps, [0], N=N)
+        mean_lufs_out, std_lufs_out = get_running_stats(loudness_out+eps, [0], N=N)
+        
+    else:
+        
+        mean_peak_tar = np.expand_dims(np.asarray([np.mean(peak_tar+eps)]), 0)
+        mean_peak_out = np.expand_dims(np.asarray([np.mean(peak_out+eps)]), 0)
+        mean_lufs_tar = np.expand_dims(np.asarray([np.mean(loudness_tar+eps)]), 0)
+        mean_lufs_out = np.expand_dims(np.asarray([np.mean(loudness_out+eps)]), 0)
+        
     mape_mean_peak = sklearn.metrics.mean_absolute_percentage_error(mean_peak_tar[0], mean_peak_out[0])
     mape_mean_lufs = sklearn.metrics.mean_absolute_percentage_error(mean_lufs_tar[0], mean_lufs_out[0])
     
