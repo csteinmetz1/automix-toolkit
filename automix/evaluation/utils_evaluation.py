@@ -16,6 +16,15 @@ def amp_to_db(x):
 def db_to_amp(x):
     return 10**(x/20)
 
+def get_mape(x, y):
+
+    try:
+        return sklearn.metrics.mean_absolute_percentage_error(x, y)
+    except Exception as e:
+        # If an exception occurs, return np.nan and print an error message
+        print(f"Error calculating mean absolute percentage error: {e}")
+        return np.nan
+
 def running_mean_std(x, N):
     
     with warnings.catch_warnings():
@@ -99,7 +108,7 @@ def get_lufs_peak_frames(x, sr, frame_size, hop_size):
     Returns:
         loudness_ and peak_ arrays
     """ 
-    
+    x = x.copy()
     x_frames = librosa.util.frame(x.T, frame_length=frame_size, hop_length=hop_size)
 
     peak_ = []
@@ -137,7 +146,8 @@ def compute_loudness_features(audio_out, audio_tar, sr, frame_size, hop_size):
     Returns:
         loudness_ dictionary
     """ 
-    
+    audio_out = audio_out.copy()
+    audio_tar = audio_tar.copy()
    
     loudness_ = {key:[] for key in ['lufs_loudness', 'peak_loudness', ]}
     
@@ -162,8 +172,8 @@ def compute_loudness_features(audio_out, audio_tar, sr, frame_size, hop_size):
         mean_lufs_tar = np.expand_dims(np.asarray([np.mean(loudness_tar+eps)]), 0)
         mean_lufs_out = np.expand_dims(np.asarray([np.mean(loudness_out+eps)]), 0)
         
-    mape_mean_peak = sklearn.metrics.mean_absolute_percentage_error(mean_peak_tar[0], mean_peak_out[0])
-    mape_mean_lufs = sklearn.metrics.mean_absolute_percentage_error(mean_lufs_tar[0], mean_lufs_out[0])
+    mape_mean_peak = get_mape(mean_peak_tar[0], mean_peak_out[0])
+    mape_mean_lufs = get_mape(mean_lufs_tar[0], mean_lufs_out[0])
     
     loudness_['peak_loudness'] = mape_mean_peak
     loudness_['lufs_loudness'] = mape_mean_lufs
@@ -192,7 +202,9 @@ def compute_spectral_features(audio_out, audio_tar, sr, fft_size=4096, hop_lengt
     Returns:
         spectral_ dictionary
     """ 
-    
+    audio_out = audio_out.copy()
+    audio_tar = audio_tar.copy()
+
     audio_out_ = pyln.normalize.peak(audio_out, -1.0)
     audio_tar_ = pyln.normalize.peak(audio_tar, -1.0)
     
@@ -212,6 +224,7 @@ def compute_spectral_features(audio_out, audio_tar, sr, fft_size=4096, hop_lengt
    
     spectral_ = {key:[] for key in ['centroid',
                                     'bandwidth',
+                                    'contrast',
                                     'contrast_lows',
                                     'contrast_mids',
                                     'contrast_highs',
@@ -277,6 +290,13 @@ def compute_spectral_features(audio_out, audio_tar, sr, fft_size=4096, hop_lengt
                                                    n_fft=fft_size, hop_length=hop_length, 
                                                    amin=1e-10, power=2.0)
         
+        # Flatness is usually computed in dB
+        tar_ft = amp_to_db(tar_ft)
+        out_ft = amp_to_db(out_ft)
+        # projection to avoid mape errors
+        tar_ft = (-1*tar_ft) + 1.0
+        out_ft = (-1*out_ft) + 1.0
+        
         eps = 1e-0
         N = 40
         mean_sc_tar, std_sc_tar = get_running_stats(tar_sc.T+eps, [0], N=N)
@@ -303,23 +323,22 @@ def compute_spectral_features(audio_out, audio_tar, sr, fft_size=4096, hop_lengt
         assert np.isnan(mean_ro_tar).any() == False, f'NAN values tar mean ro'
         assert np.isnan(mean_ro_out).any() == False, f'NAN values out mean ro'
         
-        mean_ft_tar, std_ft_tar = get_running_stats(tar_ft.T, [0], N=40) # If flatness mean error is too large, increase N. e.g. 100, 1000
-        mean_ft_out, std_ft_out = get_running_stats(out_ft.T, [0], N=40)
+        mean_ft_tar, std_ft_tar = get_running_stats(tar_ft.T, [0], N=N) 
+        mean_ft_out, std_ft_out = get_running_stats(out_ft.T, [0], N=N)
         
-        mape_mean_sc = sklearn.metrics.mean_absolute_percentage_error(mean_sc_tar[0], mean_sc_out[0])
+        mape_mean_sc = get_mape(mean_sc_tar[0], mean_sc_out[0])
         
-        mape_mean_bw = sklearn.metrics.mean_absolute_percentage_error(mean_bw_tar[0], mean_bw_out[0])
+        mape_mean_bw = get_mape(mean_bw_tar[0], mean_bw_out[0])
         
-        mape_mean_ct_l = sklearn.metrics.mean_absolute_percentage_error(mean_ct_tar[0], mean_ct_out[0])
+        mape_mean_ct_l = get_mape(mean_ct_tar[0], mean_ct_out[0])
         
-        mape_mean_ct_m = sklearn.metrics.mean_absolute_percentage_error(np.mean(mean_ct_tar[1:4], axis=0),
-                                                                        np.mean(mean_ct_out[1:4], axis=0))
+        mape_mean_ct_m = get_mape(np.mean(mean_ct_tar[1:4], axis=0), np.mean(mean_ct_out[1:4], axis=0))
 
-        mape_mean_ct_h = sklearn.metrics.mean_absolute_percentage_error(mean_ct_tar[-1], mean_ct_out[-1])
+        mape_mean_ct_h = get_mape(mean_ct_tar[-1], mean_ct_out[-1])
    
-        mape_mean_ro = sklearn.metrics.mean_absolute_percentage_error(mean_ro_tar[0], mean_ro_out[0])
+        mape_mean_ro = get_mape(mean_ro_tar[0], mean_ro_out[0])
         
-        mape_mean_ft = sklearn.metrics.mean_absolute_percentage_error(mean_ft_tar[0], mean_ft_out[0])
+        mape_mean_ft = get_mape(mean_ft_tar[0], mean_ft_out[0])
         
         centroid_mean_.append(mape_mean_sc)
         bandwidth_mean_.append(mape_mean_bw)
@@ -334,15 +353,16 @@ def compute_spectral_features(audio_out, audio_tar, sr, fft_size=4096, hop_lengt
     spectral_['contrast_lows'] = np.mean(contrast_l_mean_)
     spectral_['contrast_mids'] = np.mean(contrast_m_mean_)
     spectral_['contrast_highs'] = np.mean(contrast_h_mean_)
+    spectral_['contrast'] = np.mean([spectral_['contrast_lows'], 
+                                     spectral_['contrast_mids'], 
+                                     spectral_['contrast_highs']])
     spectral_['rolloff'] = np.mean(rolloff_mean_)
     spectral_['flatness'] = np.mean(flatness_mean_)
-    spectral_['mean_mape_spectral'] = np.mean([np.mean(centroid_mean_),
-                                      np.mean(bandwidth_mean_),
-                                      np.mean(contrast_l_mean_),
-                                      np.mean(contrast_m_mean_),
-                                      np.mean(contrast_h_mean_),
-                                      np.mean(rolloff_mean_),
-                                      np.mean(flatness_mean_),
+    spectral_['mean_mape_spectral'] = np.mean([spectral_['centroid'],
+                                      spectral_['bandwidth'],
+                                      spectral_['contrast'],
+                                      spectral_['rolloff'],
+                                      spectral_['flatness'],
                                      ])
 
     return spectral_
@@ -465,6 +485,8 @@ def compute_panning_features(audio_out, audio_tar, sr, fft_size=4096, hop_length
     Returns:
         panning_ dictionary
     """ 
+    audio_out = audio_out.copy()
+    audio_tar = audio_tar.copy()
      
     audio_out_ = pyln.normalize.peak(audio_out, -1.0)
     audio_tar_ = pyln.normalize.peak(audio_tar, -1.0)
@@ -512,10 +534,10 @@ def compute_panning_features(audio_out, audio_tar, sr, fft_size=4096, hop_length
     mean_tar, std_tar = get_running_stats(p_rms_tar, freqs, N=N)
     mean_out, std_out = get_running_stats(p_rms_out, freqs, N=N)
     
-    panning_['panning_rms_total'] = sklearn.metrics.mean_absolute_percentage_error(mean_tar[0], mean_out[0])
-    panning_['panning_rms_lows'] = sklearn.metrics.mean_absolute_percentage_error(mean_tar[1], mean_out[1])
-    panning_['panning_rms_mids'] = sklearn.metrics.mean_absolute_percentage_error(mean_tar[2], mean_out[2])
-    panning_['panning_rms_highs'] = sklearn.metrics.mean_absolute_percentage_error(mean_tar[3], mean_out[3])
+    panning_['panning_rms_total'] = get_mape(mean_tar[0], mean_out[0])
+    panning_['panning_rms_lows'] = get_mape(mean_tar[1], mean_out[1])
+    panning_['panning_rms_mids'] = get_mape(mean_tar[2], mean_out[2])
+    panning_['panning_rms_highs'] = get_mape(mean_tar[3], mean_out[3])
 
     panning_['mean_mape_panning'] = np.mean([panning_['panning_rms_total'],
                                       panning_['panning_rms_lows'],
@@ -613,7 +635,8 @@ def compute_dynamic_features(audio_out, audio_tar, sr, fft_size=4096, hop_length
     Returns:
         spectral_ dictionary
     """ 
-    
+    audio_out = audio_out.copy()
+    audio_tar = audio_tar.copy()
 
     audio_out_ = pyln.normalize.peak(audio_out, -1.0)
     audio_tar_ = pyln.normalize.peak(audio_tar, -1.0)
@@ -644,9 +667,9 @@ def compute_dynamic_features(audio_out, audio_tar, sr, fft_size=4096, hop_length
     mean_crest_tar, std_crest_tar = get_running_stats(crest_tar.T, [0], N=N)
     mean_crest_out, std_crest_out = get_running_stats(crest_out.T, [0], N=N)
         
-    dynamic_['rms_level'] = sklearn.metrics.mean_absolute_percentage_error(mean_rms_tar, mean_rms_out)
-    dynamic_['dynamic_spread'] = sklearn.metrics.mean_absolute_percentage_error(mean_dyn_tar, mean_dyn_out)
-    dynamic_['crest_factor'] = sklearn.metrics.mean_absolute_percentage_error(mean_crest_tar, mean_crest_out)
+    dynamic_['rms_level'] = get_mape(mean_rms_tar, mean_rms_out)
+    dynamic_['dynamic_spread'] = get_mape(mean_dyn_tar, mean_dyn_out)
+    dynamic_['crest_factor'] = get_mape(mean_crest_tar, mean_crest_out)
 
     dynamic_['mean_mape_dynamic'] = np.mean([dynamic_['rms_level'],
                                       dynamic_['dynamic_spread'],
@@ -679,6 +702,10 @@ def get_features(target, output, sr=44100,
     # Finds the starting and ending silences in target_mix and trims both mixes
 
     features = {}
+    
+    x = target.astype(np.float64)
+    y = output.astype(np.float64)
+
     x = target.T
     y = output.T
     
@@ -689,11 +716,15 @@ def get_features(target, output, sr=44100,
     
     # Compute Loudness features
 
+    print("Computing Loudness features...")
+
     loudness_features = compute_loudness_features(y, x, sr, frame_size, frame_hop)
     for k, i in loudness_features.items():
         features[k] = i
         
     # Compute spectral features
+
+    print("Computing Spectral features...")
 
     n_channels = x.shape[1]
     spectral_features = compute_spectral_features(y, x, sr, fft_size, fft_hop, n_channels)
@@ -702,12 +733,16 @@ def get_features(target, output, sr=44100,
         
     # Computes panning features
 
+    print("Computing Panning features...")
+
     panning_features = compute_panning_features(y, x, sr, fft_size, fft_hop)  
 
     for k, i in panning_features.items():
         features[k] = i
         
     # Computes dynamic features
+
+    print("Computing Dynamic features...")
 
     dynamic_features = compute_dynamic_features(y, x, sr, fft_size, fft_hop)
     for k, i in dynamic_features.items():
