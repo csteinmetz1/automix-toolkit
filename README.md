@@ -92,6 +92,8 @@ pip install jupyter
 jupyter notebook notebooks/
 ```
 
-- [Inference](notebooks/inference.ipynb) - In this notebook we demonstrate how to download and use pretrained models to create multitrack mixes of drum recordings. 
-- [Datasets](notebooks/datasets.ipynb) - In this notebook we provide an overview of supplied datasets.
-- [Training](notebooks/training.ipynb) - In this notebook you can train your own model on the ENST-drums dataset. 
+- [Inference](notebooks/01_inference.ipynb) - In this notebook we demonstrate how to download and use pretrained models to create multitrack mixes of drum recordings. 
+- [Datasets](notebooks/02_datasets.ipynb) - In this notebook we provide an overview of supplied datasets.
+- [Models](notebooks/03_models.ipynb) - In this notebook you can explore the Mix-Wave-U-Net and Differentiable Mixing Console models
+- [Training](notebooks/04_training.ipynb) - In this notebook you can train your own model on the ENST-drums dataset. 
+- [Evaluation](notebooks/05_evaluate.ipynb) - In this notebook you can evaluate mixes via objective metrics.
