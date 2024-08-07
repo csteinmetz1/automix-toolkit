@@ -13,6 +13,8 @@ class System(pl.LightningModule):
         super().__init__()
         self.save_hyperparameters()
 
+        self.automatic_optimization = False  # Enable manual optimization
+
         # create the model
         if self.hparams.automix_model == "mixwaveunet":
             self.model = MixWaveUNet(self.hparams.max_num_tracks, 2)
@@ -73,7 +75,6 @@ class System(pl.LightningModule):
         self,
         batch: tuple,
         batch_idx: int,
-        optimizer_idx: int = 0,
         train: bool = False,
     ):
         """Model step used for validation and training.
@@ -147,8 +148,14 @@ class System(pl.LightningModule):
 
         return loss, data_dict
 
-    def training_step(self, batch, batch_idx, optimizer_idx=0):
+    def training_step(self, batch, batch_idx):
         loss, _ = self.common_step(batch, batch_idx, train=True)
+
+        # Manually perform optimization step
+        opt = self.optimizers()
+        opt.zero_grad()
+        self.manual_backward(loss)
+        opt.step()
 
         return loss
 
